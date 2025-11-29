@@ -524,6 +524,10 @@ class ArchetypeTrainer:
         print(f"Model loaded with {vocab_size} unique cards and {len(self.processor.archetypes)} archetypes")
 
 
+
+
+
+
 class QuickClashPredictor:
     """Simple interface for making predictions with a trained model"""
 
@@ -580,6 +584,97 @@ class QuickClashPredictor:
         result = self.trainer.predict_deck(card_ids)
         display_deck_analysis(card_ids, result)
         return result
+
+class EnhancedQuickClashPredictor(QuickClashPredictor):
+    """Enhanced predictor with better error handling and GUI support"""
+
+    def predict_from_card_names_with_details(self, card_names: List[str]):
+        """Predict archetype with detailed card information"""
+        if len(card_names) != 8:
+            return {"error": "Deck must contain exactly 8 cards"}
+
+        card_ids = []
+        unknown_cards = []
+        card_details = []
+
+        for name in card_names:
+            card_id = find_card_id_by_name(name)
+            if card_id:
+                card_ids.append(card_id)
+                card_info = get_card_info(card_id)
+                card_details.append({
+                    'name': card_info['name'],
+                    'elixir': card_info['elixir'],
+                    'type': card_info['type'],
+                    'rarity': card_info['rarity']
+                })
+            else:
+                unknown_cards.append(name)
+
+        if unknown_cards:
+            return {"error": f"Unknown cards: {', '.join(unknown_cards)}"}
+
+        result = self.trainer.predict_deck(card_ids)
+
+        # Add deck statistics
+        stats = calculate_deck_stats(card_ids)
+        result['deck_stats'] = stats
+        result['card_details'] = card_details
+
+        return result
+
+    def get_deck_analysis_text(self, result: Dict) -> str:
+        """Generate formatted analysis text for GUI display"""
+        if 'error' in result:
+            return f"Error: {result['error']}"
+
+        output = []
+        output.append("🏰 CLASH ROYALE DECK ANALYSIS 🏰")
+        output.append("=" * 50)
+        output.append("")
+
+        # Archetype prediction
+        output.append(f"🏷️  PRIMARY ARCHETYPE: {result['archetype'].replace('_', ' ').title()}")
+        output.append(f"🎯 CONFIDENCE: {result['confidence']:.2%}")
+        output.append("")
+
+        # Deck statistics
+        if 'deck_stats' in result:
+            stats = result['deck_stats']
+            output.append("📊 DECK STATISTICS:")
+            output.append(f"   • Average Elixir Cost: {stats['average_elixir']:.2f}")
+            output.append(f"   • 4-Card Cycle Cost: {stats['four_card_cycle']}")
+            output.append(f"   • Total Deck Cost: {stats['total_elixir']}")
+            output.append("")
+
+        # Card type distribution
+        card_types = result.get('card_types', {})
+        output.append("🎴 CARD TYPE DISTRIBUTION:")
+        output.append(f"   • Troops: {card_types.get('troops', 0)}/8")
+        output.append(f"   • Spells: {card_types.get('spells', 0)}/8")
+        output.append(f"   • Buildings: {card_types.get('buildings', 0)}/8")
+        output.append("")
+
+        # Card details
+        if 'card_details' in result:
+            output.append("🃏 DECK COMPOSITION:")
+            rarity_names = {1: "Common", 2: "Rare", 3: "Epic", 4: "Legendary", 5: "Champion"}
+            for i, card in enumerate(result['card_details'], 1):
+                output.append(f"   {i}. {card['name']} ({card['elixir']}⏱️) - "
+                              f"{card['type'].title()} - {rarity_names[card['rarity']]}")
+            output.append("")
+
+        # All probabilities
+        output.append("📈 ALL ARCHETYPE PROBABILITIES:")
+        all_probs = result.get('all_probabilities', {})
+        for arch, prob in sorted(all_probs.items(), key=lambda x: x[1], reverse=True):
+            arch_name = arch.replace('_', ' ').title()
+            bar_length = int(prob * 20)
+            bar = "█" * bar_length + "░" * (20 - bar_length)
+            output.append(f"   • {arch_name:<15} {prob:>6.2%} {bar}")
+
+        return "\n".join(output)
+
 
 
 def train_new_model():
