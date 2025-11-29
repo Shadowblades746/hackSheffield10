@@ -33,6 +33,9 @@ class DragDropCardGUI:
 
         self.setup_card_database()
         self.create_drag_drop_interface()
+        self.selected_cards = []
+
+    
 
     def setup_card_database(self):
         """Setup card database and load images"""
