@@ -80,6 +80,7 @@ class DragDropCardGUI:
         # Deck controls
         self.create_deck_controls(right_frame)
 
+
     def create_search_filter(self, parent):
         """Create search and filter controls"""
         search_frame = ttk.Frame(parent)
@@ -107,8 +108,69 @@ class DragDropCardGUI:
         type_combo = ttk.Combobox(search_frame, textvariable=self.type_var,
                                   values=["All", "Troop", "Spell", "Building"],
                                   state="readonly", width=10)
-        type_combo.pack(side=tk.LEFT)
+        type_combo.pack(side=tk.LEFT, padx=(0, 10))
         type_combo.bind('<<ComboboxSelected>>', self.on_filter)
+
+        # Rarity filter (new)
+        ttk.Label(search_frame, text="Rarity:").pack(side=tk.LEFT, padx=(0, 5))
+        self.rarity_var = tk.StringVar(value="All")
+        rarity_combo = ttk.Combobox(search_frame, textvariable=self.rarity_var,
+                                    values=["All", "Common", "Rare", "Epic", "Legendary", "Champion"],
+                                    state="readonly", width=12)
+        rarity_combo.pack(side=tk.LEFT)
+        rarity_combo.bind('<<ComboboxSelected>>', self.on_filter)
+
+    def apply_filters(self):
+        """Apply search and filters to card display"""
+        search_text = self.search_var.get().lower()
+        elixir_filter = self.elixir_var.get()
+        type_filter = self.type_var.get()
+        rarity_filter = getattr(self, 'rarity_var', tk.StringVar(value="All")).get()
+
+        # Map rarity names to numeric values used in card data (fallback if card stores strings)
+        rarity_name_to_value = {
+            "Common": 1,
+            "Rare": 2,
+            "Epic": 3,
+            "Legendary": 4,
+            "Champion": 5
+        }
+
+        filtered_cards = []
+
+        for card in self.all_cards:
+            # Search filter
+            if search_text and search_text not in card['name'].lower():
+                continue
+
+            # Elixir filter
+            if elixir_filter != "All" and str(card['elixir']) != elixir_filter:
+                continue
+
+            # Type filter
+            if type_filter != "All" and card['type'].title() != type_filter:
+                continue
+
+            # Rarity filter
+            if rarity_filter != "All":
+                target = rarity_name_to_value.get(rarity_filter)
+                if target is not None:
+                    # card['rarity'] is typically numeric
+                    try:
+                        if int(card['rarity']) != target:
+                            continue
+                    except Exception:
+                        # fallback to string comparison if stored as text
+                        if str(card['rarity']).title() != rarity_filter:
+                            continue
+                else:
+                    # fallback string compare
+                    if str(card.get('rarity', '')).title() != rarity_filter:
+                        continue
+
+            filtered_cards.append(card)
+
+        self.display_cards(filtered_cards)
 
     def create_cards_scrollable(self, parent):
         """Create scrollable area for cards"""
@@ -392,30 +454,7 @@ class DragDropCardGUI:
         """Handle filter changes"""
         self.apply_filters()
 
-    def apply_filters(self):
-        """Apply search and filters to card display"""
-        search_text = self.search_var.get().lower()
-        elixir_filter = self.elixir_var.get()
-        type_filter = self.type_var.get()
 
-        filtered_cards = []
-
-        for card in self.all_cards:
-            # Search filter
-            if search_text and search_text not in card['name'].lower():
-                continue
-
-            # Elixir filter
-            if elixir_filter != "All" and str(card['elixir']) != elixir_filter:
-                continue
-
-            # Type filter
-            if type_filter != "All" and card['type'].title() != type_filter:
-                continue
-
-            filtered_cards.append(card)
-
-        self.display_cards(filtered_cards)
 
     def get_deck_card_names(self):
         """Get list of card names in current deck"""
