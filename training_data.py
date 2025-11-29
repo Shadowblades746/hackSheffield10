@@ -1,7 +1,4 @@
-      
-training_data = [ 
-
-
+training_data = [
         {
             'url': 'https://link.clashroyale.com/en/?clashroyale://copyDeck?deck=26000010;26000024;26000044;26000050;26000061;26000084;28000000;28000015&l=Royals&tt=159000000',
             'archetype': 'control'
@@ -419,9 +416,5 @@ training_data = [
         }, {
             'url': 'https://link.clashroyale.com/en/?clashroyale://copyDeck?deck=26000011;26000030;26000031;26000040;26000058;26000102;27000000;28000004&l=Royals&tt=159000000',
             'archetype': 'bait'
-        },
-        # ... (include all your training data here)
-        # Add the rest of your 100 training decks
+        }
     ]
-
-print(len(training_data))
