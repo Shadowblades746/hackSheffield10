@@ -826,26 +826,35 @@ class ClashRoyaleGUI:
             messagebox.showerror("Prediction Error", f"Error during prediction: {str(e)}")
 
     def predict_from_names(self):
-        """Predict from card names"""
-        card_names = []
-        for entry in self.card_entries:
-            name = entry.get().strip()
-            if name:
-                card_names.append(name)
+        """Predict from card names (remove duplicates from text inputs)."""
+        # Collect non-empty names preserving order
+        raw_names = [entry.get().strip() for entry in self.card_entries if entry.get().strip()]
+        # Deduplicate case-insensitively, keep first occurrence
+        seen = set()
+        unique_names = []
+        for n in raw_names:
+            key = n.lower()
+            if key not in seen:
+                seen.add(key)
+                unique_names.append(n)
 
-        if len(card_names) != 8:
-            messagebox.showwarning("Input Error", "Please enter exactly 8 card names.")
+        # If duplicates were removed, update the text fields to reflect cleaned list
+        if len(unique_names) != len(raw_names):
+            for i, entry in enumerate(self.card_entries):
+                entry.delete(0, tk.END)
+                if i < len(unique_names):
+                    entry.insert(0, unique_names[i])
+            messagebox.showinfo("Duplicates Removed", "Duplicate card names were removed from the input fields.")
+
+        if len(unique_names) != 8:
+            messagebox.showwarning("Input Error", "Please enter exactly 8 unique card names.")
             return
 
-        # Switch to results tab
+        # Switch to results tab and run prediction
         self.notebook.select(2)
-
-        # Show loading
         self.show_loading_message()
-
-        # Run prediction in background
         threading.Thread(target=self._predict_from_names_thread,
-                         args=(card_names,), daemon=True).start()
+                         args=(unique_names,), daemon=True).start()
 
     def _predict_from_names_thread(self, card_names):
         """Background thread for name-based prediction"""
@@ -880,34 +889,70 @@ class ClashRoyaleGUI:
         threading.Thread(target=self._predict_from_url_thread,
                          args=(url,), daemon=True).start()
 
-    def _predict_from_url_thread(self, url):
-        """Background thread for URL-based prediction"""
-        try:
-            # Store the current deck for detailed display
-            deck = self.predictor.trainer.processor.extract_deck_from_url(url)
-            self.current_deck_card_ids = deck
 
-            result = self.predictor.predict_from_url(url)
-            self.root.after(0, self.display_prediction_result, result)
-        except Exception as e:
-            self.root.after(0, self.display_error, str(e))
+
 
     def predict_from_ids(self):
-        """Predict from card IDs"""
+        """Predict from card IDs (semicolon-separated) with duplicate removal."""
         ids_text = self.ids_entry.get().strip()
         if not ids_text:
             messagebox.showwarning("Input Error", "Please enter card IDs.")
             return
 
-        # Switch to results tab
+        parts = [p.strip() for p in ids_text.split(';') if p.strip()]
+        seen = set()
+        unique_ids = []
+        for p in parts:
+            if p not in seen:
+                seen.add(p)
+                unique_ids.append(p)
+
+        # If duplicates were removed, update the IDs entry
+        if len(unique_ids) != len(parts):
+            cleaned = ';'.join(unique_ids)
+            self.ids_entry.delete(0, tk.END)
+            self.ids_entry.insert(0, cleaned)
+            messagebox.showinfo("Duplicates Removed", "Duplicate card IDs were removed from the input field.")
+
+        if len(unique_ids) != 8:
+            messagebox.showwarning("Input Error", "Please enter exactly 8 unique card IDs.")
+            return
+
+        # Switch to results tab and run prediction
         self.notebook.select(2)
-
-        # Show loading
         self.show_loading_message()
-
-        # Run prediction in background
         threading.Thread(target=self._predict_from_ids_thread,
-                         args=(ids_text,), daemon=True).start()
+                         args=(';'.join(unique_ids),), daemon=True).start()
+
+    def _predict_from_url_thread(self, url):
+        """Background thread for URL-based prediction with duplicate removal."""
+        try:
+            # Extract deck ids and dedupe while preserving order
+            deck = self.predictor.trainer.processor.extract_deck_from_url(url)
+            seen = set()
+            deduped_deck = []
+            for cid in deck:
+                if cid not in seen:
+                    seen.add(cid)
+                    deduped_deck.append(cid)
+
+            if len(deduped_deck) != len(deck):
+                # Inform user on main thread that duplicates were removed
+                self.root.after(0, lambda: messagebox.showinfo("Duplicates Removed",
+                                                               "Duplicate card IDs found in URL were removed before prediction."))
+
+            if len(deduped_deck) != 8:
+                self.root.after(0, lambda: messagebox.showwarning("Input Error",
+                                                                  "Deck must contain exactly 8 unique cards after removing duplicates."))
+                return
+
+            # Store the current deck and run prediction using deck string
+            self.current_deck_card_ids = deduped_deck
+            deck_str = ';'.join(map(str, deduped_deck))
+            result = self.predictor.predict_from_deck_string(deck_str)
+            self.root.after(0, self.display_prediction_result, result)
+        except Exception as e:
+            self.root.after(0, self.display_error, str(e))
 
     def _predict_from_ids_thread(self, ids_text):
         """Background thread for ID-based prediction"""
