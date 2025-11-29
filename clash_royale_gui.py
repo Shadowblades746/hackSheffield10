@@ -260,9 +260,21 @@ class DragDropCardGUI:
         self.deck_status = ttk.Label(controls_frame, text="Deck: 0/8 cards")
         self.deck_status.pack(side=tk.RIGHT)
 
+    # python
+    # Replace these methods inside class DragDropCardGUI in `clash_royale_gui.py`
+
     def on_card_click(self, event):
-        """Handle card click - add to first empty deck slot"""
+        """Handle card click - add to first empty deck slot, but prevent duplicates"""
         card_data = event.widget.card_data
+
+        # Prevent duplicates: check existing slots by id or name
+        for slot in self.deck_slots:
+            existing = slot.get('card')
+            if existing is not None:
+                if ('id' in existing and 'id' in card_data and existing['id'] == card_data['id']) or \
+                        (existing.get('name') == card_data.get('name')):
+                    messagebox.showinfo("Duplicate Card", f"'{card_data.get('name')}' is already in your deck.")
+                    return
 
         # Find first empty slot
         empty_slot = None
@@ -282,15 +294,25 @@ class DragDropCardGUI:
         if slot['card'] is not None:
             self.remove_card_from_slot(slot)
 
+
     def add_card_to_slot(self, card_data, slot):
-        """Add card to a deck slot"""
+        """Add card to a deck slot, guarding against duplicates"""
+        # Extra guard in case other code calls this directly
+        for s in self.deck_slots:
+            existing = s.get('card')
+            if existing is not None:
+                if ('id' in existing and 'id' in card_data and existing['id'] == card_data['id']) or \
+                        (existing.get('name') == card_data.get('name')):
+                    messagebox.showinfo("Duplicate Card", f"'{card_data.get('name')}' is already in your deck.")
+                    return
+
         slot['card'] = card_data
 
-        # Clear slot
+        # Clear slot UI
         for widget in slot['frame'].winfo_children():
             widget.destroy()
 
-        # Add card to slot
+        # Add card to slot (image or text)
         if card_data['name'] in self.card_images and self.card_images[card_data['name']]:
             card_label = tk.Label(slot['frame'], image=self.card_images[card_data['name']],
                                   bg='#27ae60')
@@ -305,6 +327,8 @@ class DragDropCardGUI:
         card_label.bind('<Button-1>', lambda e: self.remove_card_from_slot(slot))
 
         self.update_deck_status()
+
+
 
     def remove_card_from_slot(self, slot):
         """Remove card from deck slot"""
