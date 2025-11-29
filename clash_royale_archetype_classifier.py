@@ -807,3 +807,544 @@ if __name__ == "__main__":
             print(f"Error during prediction: {e}")
     else:
         print("Invalid choice. Please run again and choose 't', 'p', or 'i'.")
+
+
+
+
+
+import tkinter as tk
+from tkinter import ttk, messagebox, scrolledtext
+import json
+from typing import List, Dict, Optional
+from PIL import Image, ImageTk
+import os
+
+class Card:
+    def __init__(self, name: str, elixir_cost: int, card_type: str, rarity: str, image_path: str = ""):
+        self.name = name
+        self.elixir_cost = elixir_cost
+        self.card_type = card_type
+        self.rarity = rarity
+        self.image_path = image_path
+    
+    def __str__(self):
+        return f"{self.name} ({self.elixir_cost} elixir, {self.rarity} {self.card_type})"
+    
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'elixir_cost': self.elixir_cost,
+            'card_type': self.card_type,
+            'rarity': self.rarity
+        }
+
+class Deck:
+    def __init__(self, name: str = "My Deck"):
+        self.name = name
+        self.cards: List[Card] = []
+    
+    def add_card(self, card: Card) -> bool:
+        if len(self.cards) >= 8:
+            return False
+        if card in self.cards:
+            return False
+        self.cards.append(card)
+        return True
+    
+    def remove_card(self, card: Card) -> bool:
+        if card in self.cards:
+            self.cards.remove(card)
+            return True
+        return False
+    
+    def get_average_elixir(self) -> float:
+        if not self.cards:
+            return 0.0
+        return sum(card.elixir_cost for card in self.cards) / len(self.cards)
+    
+    def get_card_type_count(self) -> Dict[str, int]:
+        type_count = {}
+        for card in self.cards:
+            type_count[card.card_type] = type_count.get(card.card_type, 0) + 1
+        return type_count
+    
+    def get_rarity_count(self) -> Dict[str, int]:
+        rarity_count = {}
+        for card in self.cards:
+            rarity_count[card.rarity] = rarity_count.get(card.rarity, 0) + 1
+        return rarity_count
+    
+    def is_valid(self) -> bool:
+        return len(self.cards) == 8
+
+class DeckBuilderGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Clash Royale Deck Builder")
+        self.root.geometry("1200x800")
+        self.root.configure(bg='#2c3e50')
+        
+        # Initialize data
+        self.available_cards: List[Card] = []
+        self.decks: List[Deck] = []
+        self.current_deck: Optional[Deck] = None
+        self.card_images = {}  # Cache for card images
+        self.deck_card_frames = []  # Track deck card frames
+        
+        self.load_default_cards()
+        self.create_widgets()
+        self.create_new_deck()
+    
+    def load_default_cards(self):
+        """Load default Clash Royale cards"""
+        default_cards = [
+            # Troops
+            Card("Knight", 3, "Troop", "Common"),
+            Card("Archers", 3, "Troop", "Common"),
+            Card("Giant", 5, "Troop", "Rare"),
+            Card("Musketeer", 4, "Troop", "Rare"),
+            Card("P.E.K.K.A", 7, "Troop", "Epic"),
+            Card("Baby Dragon", 4, "Troop", "Epic"),
+            Card("Mega Knight", 7, "Troop", "Legendary"),
+            Card("Ice Wizard", 3, "Troop", "Legendary"),
+            Card("Mini P.E.K.K.A", 4, "Troop", "Rare"),
+            Card("Hog Rider", 4, "Troop", "Rare"),
+            Card("Valkyrie", 4, "Troop", "Rare"),
+            Card("Wizard", 5, "Troop", "Rare"),
+            Card("Skeleton Army", 3, "Troop", "Epic"),
+            Card("Goblin Gang", 3, "Troop", "Common"),
+            Card("Royal Giant", 6, "Troop", "Common"),
+            
+            # Spells
+            Card("Fireball", 4, "Spell", "Rare"),
+            Card("Zap", 2, "Spell", "Common"),
+            Card("Poison", 4, "Spell", "Epic"),
+            Card("Lightning", 6, "Spell", "Epic"),
+            Card("Arrows", 3, "Spell", "Common"),
+            Card("Rocket", 6, "Spell", "Rare"),
+            Card("Log", 2, "Spell", "Legendary"),
+            Card("Tornado", 3, "Spell", "Epic"),
+            
+            # Buildings
+            Card("Cannon", 3, "Building", "Common"),
+            Card("Inferno Tower", 5, "Building", "Rare"),
+            Card("Tesla", 4, "Building", "Common"),
+            Card("X-Bow", 6, "Building", "Epic"),
+            Card("Mortar", 4, "Building", "Common"),
+            Card("Goblin Cage", 4, "Building", "Rare"),
+        ]
+        
+        self.available_cards.extend(default_cards)
+    
+    def create_widgets(self):
+        """Create all GUI widgets"""
+        # Main frame
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Left side - Card browser
+        left_frame = ttk.LabelFrame(main_frame, text="Card Browser", padding=10)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
+        # Search and filters
+        self.setup_filters(left_frame)
+        
+        # Card list with scrollbar
+        self.setup_card_list(left_frame)
+        
+        # Right side - Deck management
+        right_frame = ttk.LabelFrame(main_frame, text="Deck Builder", padding=10)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # Deck info and controls
+        self.setup_deck_controls(right_frame)
+        
+        # Deck display area
+        self.setup_deck_display(right_frame)
+        
+        # Deck statistics
+        self.setup_deck_stats(right_frame)
+    
+    def setup_filters(self, parent):
+        """Setup search and filter controls"""
+        filter_frame = ttk.Frame(parent)
+        filter_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Search
+        ttk.Label(filter_frame, text="Search:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(filter_frame, textvariable=self.search_var)
+        self.search_entry.grid(row=0, column=1, sticky=tk.EW, padx=(0, 10))
+        self.search_entry.bind('<KeyRelease>', self.filter_cards)
+        
+        # Elixir filter
+        ttk.Label(filter_frame, text="Max Elixir:").grid(row=0, column=2, sticky=tk.W, padx=(0, 5))
+        self.elixir_var = tk.StringVar(value="Any")
+        elixir_combo = ttk.Combobox(filter_frame, textvariable=self.elixir_var, 
+                                   values=["Any", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+                                   state="readonly", width=5)
+        elixir_combo.grid(row=0, column=3, padx=(0, 10))
+        elixir_combo.bind('<<ComboboxSelected>>', self.filter_cards)
+        
+        # Type filter
+        ttk.Label(filter_frame, text="Type:").grid(row=1, column=0, sticky=tk.W, padx=(0, 5))
+        self.type_var = tk.StringVar(value="Any")
+        type_combo = ttk.Combobox(filter_frame, textvariable=self.type_var,
+                                 values=["Any", "Troop", "Spell", "Building"],
+                                 state="readonly", width=8)
+        type_combo.grid(row=1, column=1, padx=(0, 10))
+        type_combo.bind('<<ComboboxSelected>>', self.filter_cards)
+        
+        # Rarity filter
+        ttk.Label(filter_frame, text="Rarity:").grid(row=1, column=2, sticky=tk.W, padx=(0, 5))
+        self.rarity_var = tk.StringVar(value="Any")
+        rarity_combo = ttk.Combobox(filter_frame, textvariable=self.rarity_var,
+                                   values=["Any", "Common", "Rare", "Epic", "Legendary"],
+                                   state="readonly", width=10)
+        rarity_combo.grid(row=1, column=3, padx=(0, 10))
+        rarity_combo.bind('<<ComboboxSelected>>', self.filter_cards)
+        
+        filter_frame.columnconfigure(1, weight=1)
+    
+    def setup_card_list(self, parent):
+        """Setup the card list display"""
+        # Create a canvas with scrollbar for the card grid
+        canvas_frame = ttk.Frame(parent)
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.card_canvas = tk.Canvas(canvas_frame, bg='white')
+        scrollbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.card_canvas.yview)
+        self.card_canvas.configure(yscrollcommand=scrollbar.set)
+        
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.card_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Frame inside canvas for cards
+        self.card_container = ttk.Frame(self.card_canvas)
+        self.card_canvas_window = self.card_canvas.create_window((0, 0), window=self.card_container, anchor=tk.NW)
+        
+        # Bind events for scrolling and resizing
+        self.card_container.bind("<Configure>", self.on_frame_configure)
+        self.card_canvas.bind("<Configure>", self.on_canvas_configure)
+        
+        # Initial card display
+        self.display_cards()
+    
+    def setup_deck_controls(self, parent):
+        """Setup deck management controls"""
+        control_frame = ttk.Frame(parent)
+        control_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Deck name
+        ttk.Label(control_frame, text="Deck Name:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.deck_name_var = tk.StringVar(value="My Deck")
+        self.deck_name_entry = ttk.Entry(control_frame, textvariable=self.deck_name_var)
+        self.deck_name_entry.grid(row=0, column=1, sticky=tk.EW, padx=(0, 10))
+        self.deck_name_entry.bind('<KeyRelease>', self.update_deck_name)
+        
+        # Buttons
+        ttk.Button(control_frame, text="New Deck", command=self.create_new_deck).grid(row=0, column=2, padx=2)
+        ttk.Button(control_frame, text="Save Deck", command=self.save_current_deck).grid(row=0, column=3, padx=2)
+        ttk.Button(control_frame, text="Load Deck", command=self.load_deck_dialog).grid(row=0, column=4, padx=2)
+        ttk.Button(control_frame, text="Clear Deck", command=self.clear_deck).grid(row=0, column=5, padx=2)
+        
+        control_frame.columnconfigure(1, weight=1)
+    
+    def setup_deck_display(self, parent):
+        """Setup the deck card display area"""
+        deck_frame = ttk.LabelFrame(parent, text="Deck Cards (0/8)")
+        deck_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        # Deck cards grid
+        self.deck_cards_frame = ttk.Frame(deck_frame)
+        self.deck_cards_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Create 8 slots for deck cards
+        self.deck_card_frames = []
+        for i in range(8):
+            frame = ttk.Frame(self.deck_cards_frame, relief='solid', borderwidth=1, width=100, height=120)
+            frame.grid(row=i//4, column=i%4, padx=2, pady=2, sticky='nsew')
+            frame.grid_propagate(False)
+            
+            # Empty slot label
+            label = ttk.Label(frame, text="Empty\nSlot", foreground='gray', 
+                             justify=tk.CENTER, wraplength=80)
+            label.pack(expand=True, fill=tk.BOTH)
+            
+            self.deck_card_frames.append({'frame': frame, 'label': label, 'card': None})
+        
+        # Configure grid weights
+        for i in range(2):
+            self.deck_cards_frame.rowconfigure(i, weight=1)
+        for i in range(4):
+            self.deck_cards_frame.columnconfigure(i, weight=1)
+    
+    def setup_deck_stats(self, parent):
+        """Setup deck statistics display"""
+        stats_frame = ttk.LabelFrame(parent, text="Deck Statistics")
+        stats_frame.pack(fill=tk.X)
+        
+        # Stats labels
+        self.avg_elixir_label = ttk.Label(stats_frame, text="Average Elixir: 0.00")
+        self.avg_elixir_label.pack(anchor=tk.W, padx=5, pady=2)
+        
+        self.card_types_label = ttk.Label(stats_frame, text="Card Types: None")
+        self.card_types_label.pack(anchor=tk.W, padx=5, pady=2)
+        
+        self.rarities_label = ttk.Label(stats_frame, text="Rarities: None")
+        self.rarities_label.pack(anchor=tk.W, padx=5, pady=2)
+        
+        self.deck_status_label = ttk.Label(stats_frame, text="Status: Incomplete (0/8 cards)", foreground='red')
+        self.deck_status_label.pack(anchor=tk.W, padx=5, pady=2)
+    
+    def filter_cards(self, event=None):
+        """Filter cards based on current filters"""
+        self.display_cards()
+    
+    def display_cards(self):
+        """Display filtered cards in the card browser"""
+        # Clear existing cards
+        for widget in self.card_container.winfo_children():
+            widget.destroy()
+        
+        # Get filtered cards
+        filtered_cards = self.get_filtered_cards()
+        
+        # Display cards in a grid
+        row, col = 0, 0
+        max_cols = 3
+        
+        for card in filtered_cards:
+            card_frame = ttk.Frame(self.card_container, relief='solid', borderwidth=1)
+            card_frame.grid(row=row, column=col, padx=2, pady=2, sticky='nsew')
+            
+            # Card name and info
+            info_text = f"{card.name}\n{card.elixir_cost} elixir\n{card.rarity} {card.card_type}"
+            card_label = ttk.Label(card_frame, text=info_text, justify=tk.CENTER, wraplength=100)
+            card_label.pack(padx=5, pady=5)
+            
+            # Add button
+            add_btn = ttk.Button(card_frame, text="Add to Deck", 
+                               command=lambda c=card: self.add_card_to_deck(c))
+            add_btn.pack(padx=5, pady=5)
+            
+            col += 1
+            if col >= max_cols:
+                col = 0
+                row += 1
+        
+        # Configure grid weights
+        for i in range(row + 1):
+            self.card_container.rowconfigure(i, weight=1)
+        for i in range(max_cols):
+            self.card_container.columnconfigure(i, weight=1)
+    
+    def get_filtered_cards(self):
+        """Get cards based on current filters"""
+        filtered = self.available_cards
+        
+        search_term = self.search_var.get().lower()
+        if search_term:
+            filtered = [card for card in filtered if search_term in card.name.lower()]
+        
+        elixir_filter = self.elixir_var.get()
+        if elixir_filter != "Any":
+            filtered = [card for card in filtered if card.elixir_cost <= int(elixir_filter)]
+        
+        type_filter = self.type_var.get()
+        if type_filter != "Any":
+            filtered = [card for card in filtered if card.card_type == type_filter]
+        
+        rarity_filter = self.rarity_var.get()
+        if rarity_filter != "Any":
+            filtered = [card for card in filtered if card.rarity == rarity_filter]
+        
+        return filtered
+    
+    def create_new_deck(self, name=None):
+        """Create a new deck"""
+        if name is None:
+            name = self.deck_name_var.get() or "My Deck"
+        
+        self.current_deck = Deck(name)
+        self.deck_name_var.set(name)
+        self.update_deck_display()
+        messagebox.showinfo("New Deck", f"Created new deck: {name}")
+    
+    def add_card_to_deck(self, card):
+        """Add a card to the current deck"""
+        if not self.current_deck:
+            self.create_new_deck()
+        
+        if self.current_deck.add_card(card):
+            self.update_deck_display()
+        else:
+            if len(self.current_deck.cards) >= 8:
+                messagebox.showwarning("Deck Full", "Deck is full! Maximum 8 cards.")
+            else:
+                messagebox.showwarning("Duplicate Card", f"{card.name} is already in the deck!")
+    
+    def remove_card_from_deck(self, card_index):
+        """Remove a card from the deck"""
+        if self.current_deck and 0 <= card_index < len(self.current_deck.cards):
+            card = self.current_deck.cards[card_index]
+            self.current_deck.remove_card(card)
+            self.update_deck_display()
+    
+    def update_deck_display(self):
+        """Update the deck display area"""
+        if not self.current_deck:
+            return
+        
+        # Update deck frame title
+        deck_frame = self.deck_cards_frame.master
+        deck_frame.configure(text=f"Deck Cards ({len(self.current_deck.cards)}/8)")
+        
+        # Update deck card slots
+        for i, slot in enumerate(self.deck_card_frames):
+            if i < len(self.current_deck.cards):
+                card = self.current_deck.cards[i]
+                slot['label'].configure(
+                    text=f"{card.name}\n{card.elixir_cost} elixir",
+                    foreground='black'
+                )
+                # Add remove button
+                for widget in slot['frame'].winfo_children():
+                    if isinstance(widget, ttk.Button):
+                        widget.destroy()
+                
+                remove_btn = ttk.Button(slot['frame'], text="Remove", 
+                                      command=lambda idx=i: self.remove_card_from_deck(idx))
+                remove_btn.pack(side=tk.BOTTOM, pady=2)
+                
+                slot['card'] = card
+            else:
+                slot['label'].configure(text="Empty\nSlot", foreground='gray')
+                slot['card'] = None
+                # Remove any existing buttons
+                for widget in slot['frame'].winfo_children():
+                    if isinstance(widget, ttk.Button):
+                        widget.destroy()
+        
+        # Update statistics
+        self.update_deck_stats()
+    
+    def update_deck_stats(self):
+        """Update deck statistics display"""
+        if not self.current_deck:
+            return
+        
+        avg_elixir = self.current_deck.get_average_elixir()
+        card_types = self.current_deck.get_card_type_count()
+        rarities = self.current_deck.get_rarity_count()
+        
+        self.avg_elixir_label.configure(text=f"Average Elixir: {avg_elixir:.2f}")
+        self.card_types_label.configure(text=f"Card Types: {card_types}")
+        self.rarities_label.configure(text=f"Rarities: {rarities}")
+        
+        if self.current_deck.is_valid():
+            self.deck_status_label.configure(text="Status: Complete (8/8 cards)", foreground='green')
+        else:
+            self.deck_status_label.configure(
+                text=f"Status: Incomplete ({len(self.current_deck.cards)}/8 cards)", 
+                foreground='red'
+            )
+    
+    def update_deck_name(self, event=None):
+        """Update current deck name"""
+        if self.current_deck:
+            self.current_deck.name = self.deck_name_var.get()
+    
+    def save_current_deck(self):
+        """Save the current deck"""
+        if not self.current_deck:
+            messagebox.showwarning("No Deck", "No deck to save!")
+            return
+        
+        if not self.current_deck.is_valid():
+            messagebox.showwarning("Incomplete Deck", "Deck must have exactly 8 cards to save!")
+            return
+        
+        # Check if deck with same name exists
+        for deck in self.decks:
+            if deck.name == self.current_deck.name:
+                if not messagebox.askyesno("Overwrite Deck", 
+                                         f"Deck '{self.current_deck.name}' already exists. Overwrite?"):
+                    return
+                self.decks.remove(deck)
+                break
+        
+        # Create a copy of the current deck
+        import copy
+        saved_deck = copy.deepcopy(self.current_deck)
+        self.decks.append(saved_deck)
+        
+        messagebox.showinfo("Deck Saved", f"Deck '{self.current_deck.name}' saved successfully!")
+    
+    def load_deck_dialog(self):
+        """Show dialog to load a saved deck"""
+        if not self.decks:
+            messagebox.showinfo("No Saved Decks", "No decks saved yet!")
+            return
+        
+        # Create dialog window
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Load Deck")
+        dialog.geometry("300x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text="Select a deck to load:").pack(pady=10)
+        
+        # Listbox for decks
+        listbox = tk.Listbox(dialog)
+        listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        for deck in self.decks:
+            listbox.insert(tk.END, f"{deck.name} (Avg: {deck.get_average_elixir():.2f})")
+        
+        def load_selected():
+            selection = listbox.curselection()
+            if selection:
+                index = selection[0]
+                self.load_deck(index)
+                dialog.destroy()
+        
+        # Buttons
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Button(btn_frame, text="Load", command=load_selected).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT)
+    
+    def load_deck(self, index):
+        """Load a deck from saved decks"""
+        if 0 <= index < len(self.decks):
+            import copy
+            self.current_deck = copy.deepcopy(self.decks[index])
+            self.deck_name_var.set(self.current_deck.name)
+            self.update_deck_display()
+            messagebox.showinfo("Deck Loaded", f"Loaded deck: {self.current_deck.name}")
+    
+    def clear_deck(self):
+        """Clear the current deck"""
+        if self.current_deck and self.current_deck.cards:
+            if messagebox.askyesno("Clear Deck", "Are you sure you want to clear the current deck?"):
+                self.current_deck.cards.clear()
+                self.update_deck_display()
+    
+    def on_frame_configure(self, event=None):
+        """Reset the scroll region to encompass the inner frame"""
+        self.card_canvas.configure(scrollregion=self.card_canvas.bbox("all"))
+    
+    def on_canvas_configure(self, event=None):
+        """Reset the canvas window to inner frame when canvas is resized"""
+        self.card_canvas.itemconfig(self.card_canvas_window, width=event.width)
+
+def main():
+    root = tk.Tk()
+    app = DeckBuilderGUI(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
