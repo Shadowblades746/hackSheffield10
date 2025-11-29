@@ -21,234 +21,6 @@ import cards
 # Import your existing classes and functions
 from clash_royale_archetype_classifier import *
 
-# Material You Color Palette
-COLORS = {
-    'primary': '#6750A4',
-    'on_primary': '#FFFFFF',
-    'primary_container': '#EADDFF',
-    'on_primary_container': '#21005D',
-    'secondary': '#625B71',
-    'on_secondary': '#FFFFFF',
-    'secondary_container': '#E8DEF8',
-    'on_secondary_container': '#1D192B',
-    'surface': '#FFFBFE',
-    'on_surface': '#1C1B1F',
-    'surface_variant': '#E7E0EC',
-    'on_surface_variant': '#49454F',
-    'background': '#FFFBFE',
-    'on_background': '#1C1B1F',
-    'error': '#B3261E',
-    'on_error': '#FFFFFF',
-    'outline': '#79747E',
-    'shadow': '#000000',
-    'success': '#4CAF50',
-    'warning': '#FF9800',
-    'info': '#2196F3'
-}
-
-
-# python
-class MaterialButton(tk.Frame):
-    def __init__(self, parent, text, command=None, style='filled', width=120, height=36):
-        super().__init__(parent, bg=COLORS['background'])
-        self.command = command
-        self.style = style
-        self.text = text
-        self._state = 'normal'  # 'normal' or 'disabled'
-
-        # Configure styles
-        if style == 'filled':
-            self.bg_color = COLORS['primary']
-            self.fg_color = COLORS['on_primary']
-            self.hover_color = '#5A4791'
-        elif style == 'tonal':
-            self.bg_color = COLORS['secondary_container']
-            self.fg_color = COLORS['on_secondary_container']
-            self.hover_color = '#D5C6F0'
-        else:  # outlined
-            # use surface as transparent substitute for Tk
-            self.bg_color = COLORS['surface']
-            self.fg_color = COLORS['primary']
-            self.hover_color = COLORS['primary_container']
-
-        # Keep originals for restore
-        self._orig_bg = self.bg_color
-        self._orig_fg = self.fg_color
-        self._orig_hover = self.hover_color
-        self._orig_cursor = 'hand2'
-
-        self.canvas = tk.Canvas(self, width=width, height=height,
-                                bg=COLORS['background'], highlightthickness=0)
-        self.canvas.pack()
-
-        # Draw button
-        self.rect = self.canvas.create_rectangle(2, 2, width - 2, height - 2,
-                                                 fill=self.bg_color, outline='', width=0)
-        self.text_id = self.canvas.create_text(width // 2, height // 2, text=text,
-                                               fill=self.fg_color, font=('Segoe UI', 10, 'bold'))
-
-        # Bind events
-        self.canvas.bind('<Button-1>', self.on_click)
-        self.canvas.bind('<Enter>', self.on_enter)
-        self.canvas.bind('<Leave>', self.on_leave)
-        self.bind('<Button-1>', self.on_click)
-        self.bind('<Enter>', self.on_enter)
-        self.bind('<Leave>', self.on_leave)
-
-        # Set widget cursor
-        self.configure(cursor=self._orig_cursor)
-
-    def on_click(self, event):
-        if self._state != 'normal':
-            return
-        if self.command:
-            try:
-                self.command()
-            except Exception:
-                pass
-
-    def on_enter(self, event):
-        if self._state != 'normal':
-            return
-        try:
-            self.canvas.itemconfig(self.rect, fill=self.hover_color)
-        except Exception:
-            pass
-
-    def on_leave(self, event):
-        if self._state != 'normal':
-            return
-        try:
-            self.canvas.itemconfig(self.rect, fill=self.bg_color)
-        except Exception:
-            pass
-
-    def config(self, **kwargs):
-        """Accept `state` and `text`, forward other config options to the Frame."""
-        state = kwargs.pop('state', None)
-        if state is not None:
-            self.set_state(state)
-        if 'text' in kwargs:
-            txt = kwargs.pop('text')
-            self.text = txt
-            try:
-                self.canvas.itemconfig(self.text_id, text=txt)
-            except Exception:
-                pass
-        # forward any other known Frame/Widget options
-        if kwargs:
-            super().config(**kwargs)
-
-    configure = config  # alias
-
-    def set_state(self, state):
-        state = (state or '').lower()
-        if state in ('disabled', 'disable', 'off'):
-            self._state = 'disabled'
-            disabled_bg = '#D3D3D3'
-            disabled_fg = '#7F7F7F'
-            try:
-                self.canvas.itemconfig(self.rect, fill=disabled_bg)
-                self.canvas.itemconfig(self.text_id, fill=disabled_fg)
-            except Exception:
-                pass
-            # change cursor to default
-            try:
-                super().config(cursor='arrow')
-            except Exception:
-                pass
-        else:
-            self._state = 'normal'
-            self.bg_color = self._orig_bg
-            self.fg_color = self._orig_fg
-            self.hover_color = self._orig_hover
-            try:
-                self.canvas.itemconfig(self.rect, fill=self.bg_color)
-                self.canvas.itemconfig(self.text_id, fill=self.fg_color)
-            except Exception:
-                pass
-            try:
-                super().config(cursor=self._orig_cursor)
-            except Exception:
-                pass
-
-    def disable(self):
-        self.set_state('disabled')
-
-    def enable(self):
-        self.set_state('normal')
-
-
-
-class MaterialCombobox(ttk.Combobox):
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.configure(
-            font=('Segoe UI', 9),
-            state="readonly"
-        )
-
-
-class MaterialScrollbar(ttk.Scrollbar):
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.configure(style='Material.Vertical.TScrollbar')
-
-
-class MaterialCard(tk.Frame):
-    def __init__(self, parent, title="", padding=16, **kwargs):
-        super().__init__(parent, bg=COLORS['surface'], relief='flat', bd=0, **kwargs)
-        self.config(highlightbackground=COLORS['outline'], highlightthickness=1)
-
-        # Title label
-        if title:
-            title_label = tk.Label(self, text=title, bg=COLORS['surface'],
-                                   fg=COLORS['on_surface'], font=('Segoe UI', 14, 'bold'),
-                                   anchor='w')
-            title_label.pack(fill='x', padx=padding, pady=(padding, 8))
-
-        self.content_frame = tk.Frame(self, bg=COLORS['surface'])
-        self.content_frame.pack(fill='both', expand=True, padx=padding, pady=(0, padding))
-
-
-class ModernScrollableFrame(tk.Frame):
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.canvas = tk.Canvas(self, bg=COLORS['background'], highlightthickness=0)
-
-        # Create custom styled scrollbar
-        style = ttk.Style()
-        style.configure('Material.Vertical.TScrollbar',
-                        background=COLORS['surface_variant'],
-                        troughcolor=COLORS['background'],
-                        bordercolor=COLORS['outline'],
-                        arrowcolor=COLORS['on_surface_variant'],
-                        relief='flat')
-
-        self.scrollbar = MaterialScrollbar(self, orient="vertical", command=self.canvas.yview)
-        self.scrollable_frame = tk.Frame(self.canvas, bg=COLORS['background'])
-
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
-
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.scrollbar.pack(side="right", fill="y")
-
-        # Mouse wheel binding
-        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
-
-    def _on_mousewheel(self, event):
-        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-    def scroll_to_top(self):
-        """Scroll to the top of the canvas"""
-        self.canvas.yview_moveto(0)
-
 
 class DragDropCardGUI:
     def __init__(self, parent_frame, on_deck_update_callback):
@@ -280,89 +52,82 @@ class DragDropCardGUI:
     def create_drag_drop_interface(self):
         """Create the drag and drop interface"""
         # Main container for drag-drop
-        main_frame = tk.Frame(self.parent, bg=COLORS['background'])
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        main_frame = ttk.Frame(self.parent)
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Left side - All cards
-        left_card = MaterialCard(main_frame, title="Available Cards", padding=12)
-        left_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
+        left_frame = ttk.LabelFrame(main_frame, text="Available Cards", padding="10")
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
         # Search and filter
-        self.create_search_filter(left_card.content_frame)
+        self.create_search_filter(left_frame)
 
         # Cards scrollable area
-        self.create_cards_scrollable(left_card.content_frame)
+        self.create_cards_scrollable(left_frame)
 
         # Right side - Deck builder
-        right_card = MaterialCard(main_frame, title="Your Deck (0/8)", padding=12)
-        right_card.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-        self.deck_card = right_card
+        right_frame = ttk.LabelFrame(main_frame, text="Your Deck (0/8)", padding="10")
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        self.deck_label = right_frame  # Store reference to update title
 
         # Deck slots
-        self.create_deck_slots(right_card.content_frame)
+        self.create_deck_slots(right_frame)
 
         # Deck controls
-        self.create_deck_controls(right_card.content_frame)
+        self.create_deck_controls(right_frame)
 
     def create_search_filter(self, parent):
         """Create search and filter controls"""
-        search_frame = tk.Frame(parent, bg=COLORS['surface'])
-        search_frame.pack(fill=tk.X, pady=(0, 12))
+        search_frame = ttk.Frame(parent)
+        search_frame.pack(fill=tk.X, pady=(0, 10))
 
-        # Search entry with modern styling
-        tk.Label(search_frame, text="🔍", bg=COLORS['surface'],
-                 fg=COLORS['on_surface_variant'], font=('Segoe UI', 12)).pack(side=tk.LEFT, padx=(0, 8))
-
+        # Search entry
+        ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT, padx=(0, 5))
         self.search_var = tk.StringVar()
-        self.search_entry = tk.Entry(search_frame, textvariable=self.search_var,
-                                     bg=COLORS['surface_variant'], fg=COLORS['on_surface'],
-                                     insertbackground=COLORS['on_surface'],
-                                     relief='flat', font=('Segoe UI', 10),
-                                     width=20)
-        self.search_entry.pack(side=tk.LEFT, padx=(0, 16))
+        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=20)
+        self.search_entry.pack(side=tk.LEFT, padx=(0, 10))
         self.search_entry.bind('<KeyRelease>', self.on_search)
 
-        # Filter frame
-        filter_frame = tk.Frame(search_frame, bg=COLORS['surface'])
-        filter_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
         # Elixir filter
-        tk.Label(filter_frame, text="Elixir:", bg=COLORS['surface'],
-                 fg=COLORS['on_surface_variant'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 4))
-
+        ttk.Label(search_frame, text="Elixir:").pack(side=tk.LEFT, padx=(0, 5))
         self.elixir_var = tk.StringVar(value="All")
-        elixir_combo = MaterialCombobox(filter_frame, textvariable=self.elixir_var,
-                                        values=["All", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
-                                        width=6)
-        elixir_combo.pack(side=tk.LEFT, padx=(0, 12))
+        elixir_combo = ttk.Combobox(search_frame, textvariable=self.elixir_var,
+                                    values=["All", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+                                    state="readonly", width=8)
+        elixir_combo.pack(side=tk.LEFT, padx=(0, 10))
         elixir_combo.bind('<<ComboboxSelected>>', self.on_filter)
 
         # Type filter
-        tk.Label(filter_frame, text="Type:", bg=COLORS['surface'],
-                 fg=COLORS['on_surface_variant'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 4))
-
+        ttk.Label(search_frame, text="Type:").pack(side=tk.LEFT, padx=(0, 5))
         self.type_var = tk.StringVar(value="All")
-        type_combo = MaterialCombobox(filter_frame, textvariable=self.type_var,
-                                      values=["All", "Troop", "Spell", "Building"],
-                                      width=10)
-        type_combo.pack(side=tk.LEFT, padx=(0, 12))
+        type_combo = ttk.Combobox(search_frame, textvariable=self.type_var,
+                                  values=["All", "Troop", "Spell", "Building"],
+                                  state="readonly", width=10)
+        type_combo.pack(side=tk.LEFT)
         type_combo.bind('<<ComboboxSelected>>', self.on_filter)
-
-        # Rarity filter
-        tk.Label(filter_frame, text="Rarity:", bg=COLORS['surface'],
-                 fg=COLORS['on_surface_variant'], font=('Segoe UI', 9)).pack(side=tk.LEFT, padx=(0, 4))
-
-        self.rarity_var = tk.StringVar(value="All")
-        rarity_combo = MaterialCombobox(filter_frame, textvariable=self.rarity_var,
-                                        values=["All", "Common", "Rare", "Epic", "Legendary", "Champion"],
-                                        width=10)
-        rarity_combo.pack(side=tk.LEFT)
-        rarity_combo.bind('<<ComboboxSelected>>', self.on_filter)
 
     def create_cards_scrollable(self, parent):
         """Create scrollable area for cards"""
-        self.scrollable_frame = ModernScrollableFrame(parent)
-        self.scrollable_frame.pack(fill=tk.BOTH, expand=True)
+        # Create frame with scrollbar
+        card_container = ttk.Frame(parent)
+        card_container.pack(fill=tk.BOTH, expand=True)
+
+        # Canvas and scrollbar
+        self.canvas = tk.Canvas(card_container, bg='#34495e')
+        scrollbar = ttk.Scrollbar(card_container, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+
+        self.canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
         # Load and display cards
         self.load_card_images()
@@ -370,7 +135,7 @@ class DragDropCardGUI:
 
     def load_card_images(self):
         """Load card images from images directory"""
-        images_dir = "images"
+        images_dir = "images"  # Change this to your images directory path
 
         if not os.path.exists(images_dir):
             print(f"Warning: Images directory '{images_dir}' not found. Using text buttons.")
@@ -383,7 +148,7 @@ class DragDropCardGUI:
             if os.path.exists(image_path):
                 try:
                     image = Image.open(image_path)
-                    image = image.resize((90, 110), Image.Resampling.LANCZOS)
+                    image = image.resize((80, 100), Image.Resampling.LANCZOS)
                     photo = ImageTk.PhotoImage(image)
                     self.card_images[card_name] = photo
                 except Exception as e:
@@ -398,45 +163,36 @@ class DragDropCardGUI:
             cards_to_show = self.all_cards
 
         # Clear existing cards
-        for widget in self.scrollable_frame.scrollable_frame.winfo_children():
+        for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
         self.card_buttons = {}
 
         # Display cards in grid
         row, col = 0, 0
-        max_cols = 5
+        max_cols = 6
 
         for card in cards_to_show:
-            card_frame = tk.Frame(self.scrollable_frame.scrollable_frame,
-                                  bg=COLORS['surface_variant'], relief='raised',
-                                  borderwidth=1, cursor='hand2')
-            card_frame.grid(row=row, column=col, padx=4, pady=4, sticky='nsew')
-            card_frame.card_data = card
+            card_frame = ttk.Frame(self.scrollable_frame, relief='raised', borderwidth=1)
+            card_frame.grid(row=row, column=col, padx=2, pady=2, sticky='nsew')
+            card_frame.card_data = card  # Store card data
 
-            # Make frame responsive to click
+            # Make frame responsive to drag
             card_frame.bind('<Button-1>', self.on_card_click)
 
             if card['name'] in self.card_images and self.card_images[card['name']]:
                 # Use image button
                 btn = tk.Label(card_frame, image=self.card_images[card['name']],
-                               cursor='hand2', bg=COLORS['surface_variant'])
+                               cursor='hand2', bg='#2c3e50')
                 btn.pack(padx=2, pady=2)
                 btn.card_data = card
                 btn.bind('<Button-1>', self.on_card_click)
-
-                # Elixir cost overlay
-                elixir_label = tk.Label(card_frame, text=str(card['elixir']),
-                                        bg=COLORS['primary'], fg=COLORS['on_primary'],
-                                        font=('Segoe UI', 10, 'bold'), width=2)
-                elixir_label.place(x=2, y=2)
             else:
                 # Use text button
                 btn_text = f"{card['name']}\n({card['elixir']}⏱️)"
                 btn = tk.Label(card_frame, text=btn_text, cursor='hand2',
-                               bg=COLORS['surface_variant'], fg=COLORS['on_surface_variant'],
-                               font=('Segoe UI', 8), wraplength=80, justify='center')
-                btn.pack(padx=8, pady=8)
+                               bg='#34495e', fg='white', wraplength=80, justify='center')
+                btn.pack(padx=5, pady=5)
                 btn.card_data = card
                 btn.bind('<Button-1>', self.on_card_click)
 
@@ -449,28 +205,25 @@ class DragDropCardGUI:
 
         # Configure grid weights
         for i in range(max_cols):
-            self.scrollable_frame.scrollable_frame.columnconfigure(i, weight=1)
+            self.scrollable_frame.columnconfigure(i, weight=1)
 
     def create_deck_slots(self, parent):
         """Create deck slot areas"""
-        slots_frame = tk.Frame(parent, bg=COLORS['surface'])
-        slots_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
+        slots_frame = ttk.Frame(parent)
+        slots_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
         # Create 2 rows of 4 slots
         for row in range(2):
             for col in range(4):
                 slot_num = row * 4 + col
-                slot_frame = tk.Frame(slots_frame, bg=COLORS['surface_variant'],
-                                      relief='sunken', borderwidth=2,
-                                      width=110, height=130, cursor='hand2')
-                slot_frame.grid(row=row, column=col, padx=6, pady=6, sticky='nsew')
-                slot_frame.grid_propagate(False)
+                slot_frame = ttk.Frame(slots_frame, relief='sunken', borderwidth=2,
+                                       width=100, height=120)
+                slot_frame.grid(row=row, column=col, padx=5, pady=5, sticky='nsew')
+                slot_frame.grid_propagate(False)  # Keep fixed size
 
                 # Slot label
                 slot_label = tk.Label(slot_frame, text=f"Slot {slot_num + 1}",
-                                      bg=COLORS['surface_variant'],
-                                      fg=COLORS['on_surface_variant'],
-                                      font=('Segoe UI', 9))
+                                      bg='#95a5a6', fg='black')
                 slot_label.pack(fill=tk.BOTH, expand=True)
 
                 # Store slot info
@@ -481,7 +234,7 @@ class DragDropCardGUI:
                 }
                 self.deck_slots.append(slot_info)
 
-                # Make clickable
+                # Make droppable
                 slot_frame.bind('<Button-1>', lambda e, s=slot_num: self.on_slot_click(s))
 
         # Configure grid weights
@@ -492,33 +245,21 @@ class DragDropCardGUI:
 
     def create_deck_controls(self, parent):
         """Create deck control buttons"""
-        controls_frame = tk.Frame(parent, bg=COLORS['surface'])
+        controls_frame = ttk.Frame(parent)
         controls_frame.pack(fill=tk.X)
 
-        # Clear deck button
-        clear_btn = MaterialButton(controls_frame, text="Clear Deck",
-                                   command=self.clear_deck, style='tonal')
-        clear_btn.pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(controls_frame, text="Clear Deck",
+                   command=self.clear_deck).pack(side=tk.LEFT, padx=(0, 5))
 
-        # Auto-fill button
-        fill_btn = MaterialButton(controls_frame, text="Auto-fill Example",
-                                  command=self.auto_fill_example, style='tonal')
-        fill_btn.pack(side=tk.LEFT)
+        ttk.Button(controls_frame, text="Auto-fill Example",
+                   command=self.auto_fill_example).pack(side=tk.LEFT, padx=(0, 5))
 
-        # Deck status
-        self.deck_status = tk.Label(controls_frame, text="Deck: 0/8 cards",
-                                    bg=COLORS['surface'], fg=COLORS['on_surface_variant'],
-                                    font=('Segoe UI', 10))
+        self.deck_status = ttk.Label(controls_frame, text="Deck: 0/8 cards")
         self.deck_status.pack(side=tk.RIGHT)
 
     def on_card_click(self, event):
         """Handle card click - add to first empty deck slot"""
         card_data = event.widget.card_data
-
-        # Check if card is already in deck
-        if self.is_card_in_deck(card_data):
-            messagebox.showwarning("Duplicate Card", f"{card_data['name']} is already in your deck!")
-            return
 
         # Find first empty slot
         empty_slot = None
@@ -531,13 +272,6 @@ class DragDropCardGUI:
             self.add_card_to_slot(card_data, empty_slot)
         else:
             messagebox.showinfo("Deck Full", "Your deck is full! Remove a card first.")
-
-    def is_card_in_deck(self, card_data):
-        """Check if a card is already in the deck"""
-        for slot in self.deck_slots:
-            if slot['card'] is not None and slot['card']['id'] == card_data['id']:
-                return True
-        return False
 
     def on_slot_click(self, slot_index):
         """Handle slot click - remove card from slot"""
@@ -556,19 +290,12 @@ class DragDropCardGUI:
         # Add card to slot
         if card_data['name'] in self.card_images and self.card_images[card_data['name']]:
             card_label = tk.Label(slot['frame'], image=self.card_images[card_data['name']],
-                                  bg=COLORS['success'], cursor='hand2')
+                                  bg='#27ae60')
             card_label.pack(fill=tk.BOTH, expand=True)
-
-            # Elixir cost overlay
-            elixir_label = tk.Label(slot['frame'], text=str(card_data['elixir']),
-                                    bg=COLORS['primary'], fg=COLORS['on_primary'],
-                                    font=('Segoe UI', 10, 'bold'), width=2)
-            elixir_label.place(x=2, y=2)
         else:
             card_text = f"{card_data['name']}\n({card_data['elixir']}⏱️)"
-            card_label = tk.Label(slot['frame'], text=card_text, bg=COLORS['success'],
-                                  fg=COLORS['on_primary'], cursor='hand2',
-                                  font=('Segoe UI', 8), wraplength=80, justify='center')
+            card_label = tk.Label(slot['frame'], text=card_text, bg='#27ae60',
+                                  fg='white', wraplength=80, justify='center')
             card_label.pack(fill=tk.BOTH, expand=True)
 
         card_label.card_data = card_data
@@ -585,8 +312,7 @@ class DragDropCardGUI:
             widget.destroy()
 
         slot_label = tk.Label(slot['frame'], text=f"Slot {self.deck_slots.index(slot) + 1}",
-                              bg=COLORS['surface_variant'], fg=COLORS['on_surface_variant'],
-                              font=('Segoe UI', 9))
+                              bg='#95a5a6', fg='black')
         slot_label.pack(fill=tk.BOTH, expand=True)
 
         self.update_deck_status()
@@ -597,8 +323,8 @@ class DragDropCardGUI:
         card_count = len(current_cards)
 
         # Update deck label
-        self.deck_card.config(text=f"Your Deck ({card_count}/8)")
-        self.deck_status.config(text=f"Deck: {card_count}/8 cards")
+        self.deck_label.configure(text=f"Your Deck ({card_count}/8)")
+        self.deck_status.configure(text=f"Deck: {card_count}/8 cards")
 
         # Notify parent about deck update
         if self.on_deck_update:
@@ -634,21 +360,16 @@ class DragDropCardGUI:
     def on_search(self, event=None):
         """Handle search filter"""
         self.apply_filters()
-        # Scroll to top when searching
-        self.scrollable_frame.scroll_to_top()
 
     def on_filter(self, event=None):
         """Handle filter changes"""
         self.apply_filters()
-        # Scroll to top when filtering
-        self.scrollable_frame.scroll_to_top()
 
     def apply_filters(self):
         """Apply search and filters to card display"""
         search_text = self.search_var.get().lower()
         elixir_filter = self.elixir_var.get()
         type_filter = self.type_var.get()
-        rarity_filter = self.rarity_var.get()
 
         filtered_cards = []
 
@@ -665,13 +386,6 @@ class DragDropCardGUI:
             if type_filter != "All" and card['type'].title() != type_filter:
                 continue
 
-            # Rarity filter
-            if rarity_filter != "All":
-                rarity_names = {1: "Common", 2: "Rare", 3: "Epic", 4: "Legendary", 5: "Champion"}
-                card_rarity = rarity_names.get(card['rarity'], "Unknown")
-                if card_rarity != rarity_filter:
-                    continue
-
             filtered_cards.append(card)
 
         self.display_cards(filtered_cards)
@@ -685,13 +399,13 @@ class ClashRoyaleGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Clash Royale Archetype Classifier")
-        self.root.geometry("1400x900")
-        self.root.configure(bg=COLORS['background'])
+        self.root.geometry("1200x800")  # Larger window for drag-drop
+        self.root.configure(bg='#2c3e50')
 
         # Initialize predictor
         self.predictor = None
         self.load_model_attempted = False
-        self.current_deck_card_ids = []
+        self.current_deck_card_ids = []  # Add this line to track current deck
 
         # Style configuration
         self.setup_styles()
@@ -703,65 +417,41 @@ class ClashRoyaleGUI:
         self.load_model_background()
 
     def setup_styles(self):
-        """Configure modern styles"""
+        """Configure ttk styles"""
         style = ttk.Style()
         style.theme_use('clam')
 
-        # Configure ttk styles to match Material You
-        style.configure('TNotebook', background=COLORS['background'], borderwidth=0)
-        style.configure('TNotebook.Tab',
-                        background=COLORS['surface_variant'],
-                        foreground=COLORS['on_surface_variant'],
-                        padding=[20, 8],
-                        font=('Segoe UI', 10))
-        style.map('TNotebook.Tab',
-                  background=[('selected', COLORS['primary'])],
-                  foreground=[('selected', COLORS['on_primary'])])
+        # Configure colors
+        style.configure('Title.TLabel',
+                        background='#2c3e50',
+                        foreground='#ecf0f1',
+                        font=('Arial', 16, 'bold'))
 
-        # Configure Combobox style
-        style.configure('TCombobox',
-                        fieldbackground=COLORS['surface_variant'],
-                        background=COLORS['surface_variant'],
-                        foreground=COLORS['on_surface'],
-                        selectbackground=COLORS['primary'],
-                        selectforeground=COLORS['on_primary'],
-                        borderwidth=1,
-                        relief='flat')
+        style.configure('Subtitle.TLabel',
+                        background='#2c3e50',
+                        foreground='#bdc3c7',
+                        font=('Arial', 12))
 
-        style.map('TCombobox',
-                  fieldbackground=[('readonly', COLORS['surface_variant'])],
-                  selectbackground=[('readonly', COLORS['primary'])],
-                  selectforeground=[('readonly', COLORS['on_primary'])])
+        style.configure('Card.TFrame',
+                        background='#34495e',
+                        relief='raised',
+                        borderwidth=1)
 
-        # Configure Scrollbar style
-        style.configure('Material.Vertical.TScrollbar',
-                        background=COLORS['surface_variant'],
-                        troughcolor=COLORS['background'],
-                        bordercolor=COLORS['outline'],
-                        arrowcolor=COLORS['on_surface_variant'],
-                        relief='flat')
+        style.configure('Accent.TButton',
+                        background='#e74c3c',
+                        foreground='white',
+                        font=('Arial', 10, 'bold'))
+
+        style.configure('Success.TButton',
+                        background='#27ae60',
+                        foreground='white',
+                        font=('Arial', 10, 'bold'))
 
     def create_main_interface(self):
         """Create the main GUI interface"""
-        # Header
-        header_frame = tk.Frame(self.root, bg=COLORS['primary'], height=80)
-        header_frame.pack(fill=tk.X, padx=0, pady=0)
-        header_frame.pack_propagate(False)
-
-        title_label = tk.Label(header_frame, text="Clash Royale Archetype Classifier",
-                               bg=COLORS['primary'], fg=COLORS['on_primary'],
-                               font=('Segoe UI', 20, 'bold'))
-        title_label.pack(side=tk.LEFT, padx=24, pady=20)
-
-        # Status in header
-        self.status_label = tk.Label(header_frame, text="Loading model...",
-                                     bg=COLORS['primary'], fg=COLORS['on_primary'],
-                                     font=('Segoe UI', 10))
-        self.status_label.pack(side=tk.RIGHT, padx=24, pady=20)
-
         # Create notebook for tabs
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Create tabs
         self.create_drag_drop_tab()
@@ -770,37 +460,46 @@ class ClashRoyaleGUI:
 
     def create_drag_drop_tab(self):
         """Create drag and drop tab"""
-        drag_drop_frame = tk.Frame(self.notebook, bg=COLORS['background'])
-        self.notebook.add(drag_drop_frame, text="🎴 Deck Builder")
+        drag_drop_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(drag_drop_frame, text="Drag & Drop Builder")
+
+        # Model status
+        status_frame = ttk.Frame(drag_drop_frame)
+        status_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.status_label = ttk.Label(status_frame,
+                                      text="Loading model...",
+                                      style='Subtitle.TLabel')
+        self.status_label.pack(side=tk.LEFT)
 
         # Create drag-drop interface
         self.drag_drop_gui = DragDropCardGUI(drag_drop_frame, self.on_deck_update)
 
         # Predict button for drag-drop
-        predict_frame = tk.Frame(drag_drop_frame, bg=COLORS['background'])
-        predict_frame.pack(fill=tk.X, pady=16)
+        predict_frame = ttk.Frame(drag_drop_frame)
+        predict_frame.pack(fill=tk.X, pady=(10, 0))
 
-        self.drag_predict_btn = MaterialButton(predict_frame,
-                                               text="Analyze Deck Archetype",
-                                               command=self.predict_from_drag_drop,
-                                               style='filled', width=200)
+        self.drag_predict_btn = ttk.Button(predict_frame,
+                                           text="Predict Archetype from Deck",
+                                           command=self.predict_from_drag_drop,
+                                           style='Accent.TButton',
+                                           state='disabled')
         self.drag_predict_btn.pack()
-        self.drag_predict_btn.config(state='disabled')
 
     def create_text_input_tab(self):
         """Create traditional text input tab"""
-        text_frame = tk.Frame(self.notebook, bg=COLORS['background'])
-        self.notebook.add(text_frame, text="📝 Text Input")
+        text_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(text_frame, text="Text Input")
 
         # Input method selection
         self.create_input_method_section(text_frame)
 
     def create_results_tab(self):
         """Create results display tab"""
-        results_frame = tk.Frame(self.notebook, bg=COLORS['background'])
-        self.notebook.add(results_frame, text="📊 Analysis Results")
+        results_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(results_frame, text="Analysis Results")
 
-        # Results section
+        # Results text area
         self.create_results_section(results_frame)
 
         # Training section
@@ -808,12 +507,12 @@ class ClashRoyaleGUI:
 
     def create_input_method_section(self, parent):
         """Create deck input method selection section"""
-        input_card = MaterialCard(parent, title="Text Input Methods", padding=20)
-        input_card.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        input_frame = ttk.LabelFrame(parent, text="Text Input Methods", padding="15")
+        input_frame.pack(fill=tk.BOTH, expand=True)
 
         # Method selection
-        method_frame = tk.Frame(input_card.content_frame, bg=COLORS['surface'])
-        method_frame.pack(fill=tk.X, pady=(0, 20))
+        method_frame = ttk.Frame(input_frame)
+        method_frame.pack(fill=tk.X, pady=(0, 15))
 
         self.input_method = tk.StringVar(value="names")
 
@@ -828,139 +527,118 @@ class ClashRoyaleGUI:
                         command=self.on_method_change).pack(side=tk.LEFT)
 
         # Input areas
-        self.create_names_input(input_card.content_frame)
-        self.create_url_input(input_card.content_frame)
-        self.create_ids_input(input_card.content_frame)
+        self.create_names_input(input_frame)
+        self.create_url_input(input_frame)
+        self.create_ids_input(input_frame)
 
         # Predict button
-        self.predict_btn = MaterialButton(input_card.content_frame,
-                                          text="Predict Archetype",
-                                          command=self.predict_archetype,
-                                          style='filled', width=180)
-        self.predict_btn.pack(pady=(20, 0))
-        self.predict_btn.config(state='disabled')
+        self.predict_btn = ttk.Button(input_frame,
+                                      text="Predict Archetype",
+                                      command=self.predict_archetype,
+                                      style='Accent.TButton',
+                                      state='disabled')
+        self.predict_btn.pack(pady=(10, 0))
 
     def create_names_input(self, parent):
         """Create card names input section"""
-        self.names_frame = tk.Frame(parent, bg=COLORS['surface'])
+        self.names_frame = ttk.Frame(parent)
 
-        instruction_label = tk.Label(self.names_frame,
-                                     text="Enter 8 card names (one per line):",
-                                     bg=COLORS['surface'], fg=COLORS['on_surface'],
-                                     font=('Segoe UI', 11))
-        instruction_label.pack(anchor=tk.W, pady=(0, 12))
+        instruction_label = ttk.Label(self.names_frame,
+                                      text="Enter 8 card names (one per line):")
+        instruction_label.pack(anchor=tk.W, pady=(0, 10))
 
         # Card entries frame
-        entries_frame = tk.Frame(self.names_frame, bg=COLORS['surface'])
+        entries_frame = ttk.Frame(self.names_frame)
         entries_frame.pack(fill=tk.X)
 
         self.card_entries = []
         for i in range(8):
-            row_frame = tk.Frame(entries_frame, bg=COLORS['surface'])
-            row_frame.pack(fill=tk.X, pady=4)
+            row_frame = ttk.Frame(entries_frame)
+            row_frame.pack(fill=tk.X, pady=2)
 
-            label = tk.Label(row_frame, text=f"Card {i + 1}:", width=8,
-                             bg=COLORS['surface'], fg=COLORS['on_surface'],
-                             font=('Segoe UI', 10))
+            label = ttk.Label(row_frame, text=f"Card {i + 1}:", width=8)
             label.pack(side=tk.LEFT)
 
-            entry = tk.Entry(row_frame, width=30, bg=COLORS['surface_variant'],
-                             fg=COLORS['on_surface'], insertbackground=COLORS['on_surface'],
-                             relief='flat', font=('Segoe UI', 10))
-            entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(8, 0))
+            entry = ttk.Entry(row_frame, width=30)
+            entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
             self.card_entries.append(entry)
 
             # Add autocomplete
             self.setup_autocomplete(entry)
 
         # Control buttons
-        control_frame = tk.Frame(self.names_frame, bg=COLORS['surface'])
-        control_frame.pack(fill=tk.X, pady=(16, 0))
+        control_frame = ttk.Frame(self.names_frame)
+        control_frame.pack(fill=tk.X, pady=(10, 0))
 
-        fill_btn = MaterialButton(control_frame, text="Fill Example Deck",
-                                  command=self.fill_example_deck, style='tonal')
-        fill_btn.pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Button(control_frame, text="Fill Example Deck",
+                   command=self.fill_example_deck).pack(side=tk.LEFT, padx=(0, 10))
 
-        clear_btn = MaterialButton(control_frame, text="Clear All Fields",
-                                   command=self.clear_text_fields, style='tonal')
-        clear_btn.pack(side=tk.LEFT)
+        ttk.Button(control_frame, text="Clear All Fields",
+                   command=self.clear_text_fields).pack(side=tk.LEFT)
 
     def create_url_input(self, parent):
         """Create deck URL input section"""
-        self.url_frame = tk.Frame(parent, bg=COLORS['surface'])
+        self.url_frame = ttk.Frame(parent)
 
-        instruction_label = tk.Label(self.url_frame,
-                                     text="Enter Clash Royale deck URL:",
-                                     bg=COLORS['surface'], fg=COLORS['on_surface'],
-                                     font=('Segoe UI', 11))
-        instruction_label.pack(anchor=tk.W, pady=(0, 12))
+        instruction_label = ttk.Label(self.url_frame,
+                                      text="Enter Clash Royale deck URL:")
+        instruction_label.pack(anchor=tk.W, pady=(0, 10))
 
-        self.url_entry = tk.Entry(self.url_frame, width=80, bg=COLORS['surface_variant'],
-                                  fg=COLORS['on_surface'], insertbackground=COLORS['on_surface'],
-                                  relief='flat', font=('Segoe UI', 10))
+        self.url_entry = ttk.Entry(self.url_frame, width=80)
         self.url_entry.pack(fill=tk.X)
 
         # Example URL
-        example_label = tk.Label(self.url_frame,
-                                 text="Example: clashroyale://copyDeck?deck=26000063;26000015;...",
-                                 bg=COLORS['surface'], fg=COLORS['on_surface_variant'],
-                                 font=('Segoe UI', 9))
-        example_label.pack(anchor=tk.W, pady=(8, 0))
+        example_label = ttk.Label(self.url_frame,
+                                  text="Example: clashroyale://copyDeck?deck=26000063;26000015;...",
+                                  font=('Arial', 8),
+                                  foreground='#7f8c8d')
+        example_label.pack(anchor=tk.W, pady=(5, 0))
 
         # Control buttons
-        control_frame = tk.Frame(self.url_frame, bg=COLORS['surface'])
-        control_frame.pack(fill=tk.X, pady=(12, 0))
+        control_frame = ttk.Frame(self.url_frame)
+        control_frame.pack(fill=tk.X, pady=(5, 0))
 
-        clear_btn = MaterialButton(control_frame, text="Clear URL",
-                                   command=lambda: self.url_entry.delete(0, tk.END),
-                                   style='tonal')
-        clear_btn.pack(side=tk.LEFT)
+        ttk.Button(control_frame, text="Clear URL",
+                   command=lambda: self.url_entry.delete(0, tk.END)).pack(side=tk.LEFT)
 
     def create_ids_input(self, parent):
         """Create card IDs input section"""
-        self.ids_frame = tk.Frame(parent, bg=COLORS['surface'])
+        self.ids_frame = ttk.Frame(parent)
 
-        instruction_label = tk.Label(self.ids_frame,
-                                     text="Enter 8 card IDs (semicolon-separated):",
-                                     bg=COLORS['surface'], fg=COLORS['on_surface'],
-                                     font=('Segoe UI', 11))
-        instruction_label.pack(anchor=tk.W, pady=(0, 12))
+        instruction_label = ttk.Label(self.ids_frame,
+                                      text="Enter 8 card IDs (semicolon-separated):")
+        instruction_label.pack(anchor=tk.W, pady=(0, 10))
 
-        self.ids_entry = tk.Entry(self.ids_frame, width=80, bg=COLORS['surface_variant'],
-                                  fg=COLORS['on_surface'], insertbackground=COLORS['on_surface'],
-                                  relief='flat', font=('Segoe UI', 10))
+        self.ids_entry = ttk.Entry(self.ids_frame, width=80)
         self.ids_entry.pack(fill=tk.X)
 
         # Example
-        example_label = tk.Label(self.ids_frame,
-                                 text="Example: 26000063;26000015;26000009;26000018;26000068;28000012;28000015;27000007",
-                                 bg=COLORS['surface'], fg=COLORS['on_surface_variant'],
-                                 font=('Segoe UI', 9))
-        example_label.pack(anchor=tk.W, pady=(8, 0))
+        example_label = ttk.Label(self.ids_frame,
+                                  text="Example: 26000063;26000015;26000009;26000018;26000068;28000012;28000015;27000007",
+                                  font=('Arial', 8),
+                                  foreground='#7f8c8d')
+        example_label.pack(anchor=tk.W, pady=(5, 0))
 
         # Control buttons
-        control_frame = tk.Frame(self.ids_frame, bg=COLORS['surface'])
-        control_frame.pack(fill=tk.X, pady=(12, 0))
+        control_frame = ttk.Frame(self.ids_frame)
+        control_frame.pack(fill=tk.X, pady=(5, 0))
 
-        clear_btn = MaterialButton(control_frame, text="Clear IDs",
-                                   command=lambda: self.ids_entry.delete(0, tk.END),
-                                   style='tonal')
-        clear_btn.pack(side=tk.LEFT)
+        ttk.Button(control_frame, text="Clear IDs",
+                   command=lambda: self.ids_entry.delete(0, tk.END)).pack(side=tk.LEFT)
 
     def create_results_section(self, parent):
         """Create results display section"""
-        results_card = MaterialCard(parent, title="Prediction Results", padding=16)
-        results_card.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        results_frame = ttk.LabelFrame(parent, text="Prediction Results", padding="15")
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
 
         # Results text area
-        self.results_text = scrolledtext.ScrolledText(results_card.content_frame,
+        self.results_text = scrolledtext.ScrolledText(results_frame,
                                                       height=20,
                                                       wrap=tk.WORD,
                                                       font=('Consolas', 10),
-                                                      bg=COLORS['surface'],
-                                                      fg=COLORS['on_surface'],
-                                                      insertbackground=COLORS['on_surface'],
-                                                      relief='flat')
+                                                      bg='#2c3e50',
+                                                      fg='#ecf0f1',
+                                                      insertbackground='white')
         self.results_text.pack(fill=tk.BOTH, expand=True)
 
         # Make text widget read-only
@@ -968,15 +646,15 @@ class ClashRoyaleGUI:
 
     def create_training_section(self, parent):
         """Create model training section"""
-        training_frame = tk.Frame(parent, bg=COLORS['background'])
-        training_frame.pack(fill=tk.X, pady=16)
+        training_frame = ttk.Frame(parent)
+        training_frame.pack(fill=tk.X)
 
         # Training button
-        self.train_btn = MaterialButton(training_frame,
-                                        text="Train New Model",
-                                        command=self.train_model,
-                                        style='filled')
-        self.train_btn.pack(side=tk.LEFT, padx=(0, 12))
+        self.train_btn = ttk.Button(training_frame,
+                                    text="Train New Model",
+                                    command=self.train_model,
+                                    style='Success.TButton')
+        self.train_btn.pack(side=tk.LEFT, padx=(0, 10))
 
         # Progress bar for training
         self.progress = ttk.Progressbar(training_frame, mode='indeterminate')
