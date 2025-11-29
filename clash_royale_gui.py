@@ -339,8 +339,8 @@ class DragDropCardGUI:
     def auto_fill_example(self):
         """Auto-fill with an example deck"""
         example_cards = [
-            "Mega Knight", "P.E.K.K.A", "Bandit", "Royal Ghost",
-            "Electro Wizard", "Zap", "Poison", "Tornado"
+            "MegaKnight", "PEKKA", "Bandit", "Ghost",
+            "EWiz", "Zap", "Poison", "Tornado"
         ]
 
         self.clear_deck()
@@ -405,6 +405,7 @@ class ClashRoyaleGUI:
         # Initialize predictor
         self.predictor = None
         self.load_model_attempted = False
+        self.current_deck_card_ids = []  # Add this line to track current deck
 
         # Style configuration
         self.setup_styles()
@@ -697,6 +698,14 @@ class ClashRoyaleGUI:
             messagebox.showwarning("Incomplete Deck", "Please add exactly 8 cards to your deck.")
             return
 
+        # Store the current deck for detailed display
+        card_ids = []
+        for name in card_names:
+            card_id = find_card_id_by_name(name)
+            if card_id:
+                card_ids.append(card_id)
+        self.current_deck_card_ids = card_ids
+
         # Switch to results tab
         self.notebook.select(2)
 
@@ -814,6 +823,14 @@ class ClashRoyaleGUI:
     def _predict_from_names_thread(self, card_names):
         """Background thread for name-based prediction"""
         try:
+            # Store the current deck for detailed display
+            card_ids = []
+            for name in card_names:
+                card_id = find_card_id_by_name(name)
+                if card_id:
+                    card_ids.append(card_id)
+            self.current_deck_card_ids = card_ids
+
             result = self.predictor.predict_from_card_names(card_names)
             self.root.after(0, self.display_prediction_result, result)
         except Exception as e:
@@ -839,6 +856,10 @@ class ClashRoyaleGUI:
     def _predict_from_url_thread(self, url):
         """Background thread for URL-based prediction"""
         try:
+            # Store the current deck for detailed display
+            deck = self.predictor.trainer.processor.extract_deck_from_url(url)
+            self.current_deck_card_ids = deck
+
             result = self.predictor.predict_from_url(url)
             self.root.after(0, self.display_prediction_result, result)
         except Exception as e:
@@ -864,6 +885,10 @@ class ClashRoyaleGUI:
     def _predict_from_ids_thread(self, ids_text):
         """Background thread for ID-based prediction"""
         try:
+            # Store the current deck for detailed display
+            deck = self.predictor.trainer.processor.extract_from_deck_string(ids_text)
+            self.current_deck_card_ids = deck
+
             result = self.predictor.predict_from_deck_string(ids_text)
             self.root.after(0, self.display_prediction_result, result)
         except Exception as e:
@@ -884,25 +909,62 @@ class ClashRoyaleGUI:
         if 'error' in result:
             self.results_text.insert(tk.END, f"Error: {result['error']}")
         else:
-            # Format the results nicely
-            output = f"🏰 CLASH ROYALE DECK ANALYSIS 🏰\n"
+            # Get deck stats and card details
+            deck = []
+            if hasattr(self, 'current_deck_card_ids'):
+                deck = self.current_deck_card_ids
+            elif 'deck_stats' in result:
+                # Extract card IDs from deck stats if available
+                deck = [card['id'] for card in result['deck_stats']['card_details']]
+
+            # Calculate deck stats if not already in result
+            if 'deck_stats' not in result and deck:
+                result['deck_stats'] = calculate_deck_stats(deck)
+
+            # Format the results with all the detailed information
+            output = f"Model loaded with {len(self.predictor.trainer.processor.card_id_to_index)} unique cards and {len(self.predictor.trainer.processor.archetypes)} archetypes\n\n"
+            output += "=" * 50 + "\n"
+            output += "DECK ANALYSIS\n"
             output += "=" * 50 + "\n\n"
 
-            output += f"🏷️  ARCHETYPE: {result['archetype'].upper()}\n"
-            output += f"🎯 CONFIDENCE: {result['confidence']:.2%}\n\n"
+            output += f"Archetype: {result['archetype']}\n"
+            output += f"Confidence: {result['confidence']:.2%}\n\n"
+
+            # Deck statistics
+            if 'deck_stats' in result:
+                stats = result['deck_stats']
+                output += f"Average Elixir Cost: {stats['average_elixir']:.2f}\n"
+                output += f"4-Card Cycle Cost: {stats['four_card_cycle']}\n"
+                output += f"Total Deck Cost: {stats['total_elixir']}\n\n"
 
             # Card type distribution
             card_types = result.get('card_types', {})
-            output += "📊 CARD TYPE DISTRIBUTION:\n"
-            output += f"   • Troops: {card_types.get('troops', 0)}/8\n"
-            output += f"   • Spells: {card_types.get('spells', 0)}/8\n"
-            output += f"   • Buildings: {card_types.get('buildings', 0)}/8\n\n"
+            output += f"Card Types: {card_types}\n\n"
+
+            # Deck composition
+            output += "Deck Composition:\n"
+            output += "-" * 40 + "\n"
+
+            if 'deck_stats' in result and 'card_details' in result['deck_stats']:
+                rarity_names = {1: "Common", 2: "Rare", 3: "Epic", 4: "Legendary", 5: "Champion"}
+                for i, card in enumerate(result['deck_stats']['card_details'], 1):
+                    output += f"{i}. {card['name']} ({card['elixir']} elixir) - {card['type'].title()} - {rarity_names[card['rarity']]}\n"
+            else:
+                # Fallback: try to get card details from the deck
+                if deck:
+                    rarity_names = {1: "Common", 2: "Rare", 3: "Epic", 4: "Legendary", 5: "Champion"}
+                    for i, card_id in enumerate(deck, 1):
+                        card_info = get_card_info(card_id)
+                        output += f"{i}. {card_info['name']} ({card_info['elixir']} elixir) - {card_info['type'].title()} - {rarity_names[card_info['rarity']]}\n"
+
+            output += "\n"
 
             # All probabilities
-            output += "📈 ALL ARCHETYPE PROBABILITIES:\n"
+            output += "All Archetype Probabilities:\n"
+            output += "-" * 30 + "\n"
             all_probs = result.get('all_probabilities', {})
             for arch, prob in sorted(all_probs.items(), key=lambda x: x[1], reverse=True):
-                output += f"   • {arch.replace('_', ' ').title()}: {prob:.2%}\n"
+                output += f"  {arch}: {prob:.2%}\n"
 
             self.results_text.insert(tk.END, output)
 
