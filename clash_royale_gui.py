@@ -374,8 +374,8 @@ class DragDropCardGUI:
         ttk.Button(controls_frame, text="Auto-fill Example",
                    command=self.auto_fill_example).pack(side=tk.LEFT, padx=(0, 5))
 
-        self.deck_status = ttk.Label(controls_frame, text="Deck: 0/8 cards")
-        self.deck_status.pack(side=tk.RIGHT)
+        # self.deck_status = ttk.Label(controls_frame, text="Deck: 0/8 cards")
+        # self.deck_status.pack(side=tk.RIGHT)
 
     # python
     # Replace these methods inside class DragDropCardGUI in `clash_royale_gui.py`
@@ -461,14 +461,22 @@ class DragDropCardGUI:
 
         self.update_deck_status()
 
+    # python
     def update_deck_status(self):
-        """Update deck status and notify parent"""
+        """Update deck status and show running total and average elixir."""
         current_cards = [slot['card'] for slot in self.deck_slots if slot['card'] is not None]
         card_count = len(current_cards)
 
-        # Update deck label
-        self.deck_label.configure(text=f"Your Deck ({card_count}/8)")
-        self.deck_status.configure(text=f"Deck: {card_count}/8 cards")
+        # Compute total and average elixir safely (handle missing or non-dict entries)
+        total_elixir = sum((c.get('elixir', 0) if isinstance(c, dict) else 0) for c in current_cards)
+        avg_elixir = (total_elixir / card_count) if card_count > 0 else 0.0
+
+        # Update the deck frame title with elixir info (self.deck_label is the LabelFrame)
+        try:
+            self.deck_label.configure(
+                text=f"Your Deck ({card_count}/8)  —  Avg: {avg_elixir:.2f}  •  Total: {total_elixir}")
+        except Exception:
+            pass
 
         # Notify parent about deck update
         if self.on_deck_update:
