@@ -600,26 +600,29 @@ class ClashRoyaleGUI:
 
 
 
-    # ...existing code...
+   # ...existing code...
     def create_deck_overview_tab(self):
-        """Create Deck overview tab with pie + bar charts of deck composition and archetype probabilities and deck images"""
+        """Create Deck overview tab with pie (left) + bar (center) + pie (right) charts and deck images"""
         overview_frame = ttk.Frame(self.notebook, padding="10")
         self.notebook.add(overview_frame, text="Deck overview")
 
-        # Chart area (pie on left, bar on right)
+        # Chart area (pie left, bar center, pie right)
         chart_frame = ttk.LabelFrame(overview_frame, text="Deck Summary", padding="8")
         chart_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 8))
 
-        # Create matplotlib figure with two subplots (pie left, bar right)
-        fig = plt.Figure(figsize=(9, 3.5), dpi=100)
-        ax_pie = fig.add_subplot(1, 2, 1)
-        ax_bar = fig.add_subplot(1, 2, 2)
+        # Create matplotlib figure with three subplots
+        fig = plt.Figure(figsize=(12, 3.5), dpi=100)
+        ax_pie = fig.add_subplot(1, 3, 1)
+        ax_bar = fig.add_subplot(1, 3, 2)
+        ax_train_pie = fig.add_subplot(1, 3, 3)
 
         # initial placeholders
         ax_pie.text(0.5, 0.5, "No deck", ha='center', va='center')
         ax_bar.text(0.5, 0.5, "No probabilities", ha='center', va='center')
+        ax_train_pie.text(0.5, 0.5, "No training data", ha='center', va='center')
         ax_pie.set_axis_off()
         ax_bar.set_axis_off()
+        ax_train_pie.set_axis_off()
 
         canvas = FigureCanvasTkAgg(fig, master=chart_frame)
         canvas_widget = canvas.get_tk_widget()
@@ -627,6 +630,7 @@ class ClashRoyaleGUI:
         self.overview_fig = fig
         self.overview_ax_pie = ax_pie
         self.overview_ax_bar = ax_bar
+        self.overview_ax_train_pie = ax_train_pie
         self.overview_canvas = canvas
         self.overview_canvas_widget = canvas_widget
 
@@ -638,12 +642,13 @@ class ClashRoyaleGUI:
         images_frame.pack(fill=tk.X, expand=False)
         self.overview_images_frame = images_frame
         self.overview_card_photos = []  # keep references to PhotoImage objects
-    # ...existing code...
 
+        # ...existing code...
     def update_deck_overview(self, all_probabilities: dict, deck_card_ids: list):
         """Update overview tab with:
         - pie chart (left) showing Troop/Spell/Building ratios
-        - bar chart (right) showing archetype probabilities (bars bottom->top)
+        - bar chart (center) showing archetype probabilities
+        - pie chart (right) showing archetype ratios in training data (from training_data.py)
         - stats (avg elixir, 4-card cycle) as suptitle and deck images below
         """
         try:
@@ -655,7 +660,6 @@ class ClashRoyaleGUI:
                 avg_elixir = stats.get('average_elixir')
                 four_card_cycle = stats.get('four_card_cycle')
             except Exception:
-                # fallback compute
                 elixirs = []
                 for cid in deck_card_ids or []:
                     try:
@@ -672,15 +676,17 @@ class ClashRoyaleGUI:
             fig = getattr(self, 'overview_fig', None)
             ax_pie = getattr(self, 'overview_ax_pie', None)
             ax_bar = getattr(self, 'overview_ax_bar', None)
-            if fig is None or ax_pie is None or ax_bar is None:
-                # recreate if missing
+            ax_train_pie = getattr(self, 'overview_ax_train_pie', None)
+            if fig is None or ax_pie is None or ax_bar is None or ax_train_pie is None:
                 self.create_deck_overview_tab()
                 fig = self.overview_fig
                 ax_pie = self.overview_ax_pie
                 ax_bar = self.overview_ax_bar
+                ax_train_pie = self.overview_ax_train_pie
 
             ax_pie.clear()
             ax_bar.clear()
+            ax_train_pie.clear()
 
             # Title/stats above charts
             stats_parts = []
@@ -694,28 +700,20 @@ class ClashRoyaleGUI:
             except Exception:
                 pass
 
-            # PIE CHART: Troop / Spell / Building (and Other)
+            # PIE CHART (LEFT): Troop / Spell / Building (and Other)
             type_counts = {"troop": 0, "spell": 0, "building": 0, "other": 0}
             for cid in deck_card_ids or []:
                 try:
                     info = get_card_info(cid)
                     ctype = (info.get('type') or '').lower()
-                    if 'troop' in ctype or 'unit' in ctype or ctype == 'card':
+                    if 'troop' in ctype or 'unit' in ctype or ctype == 'card' or ctype == 'troops':
                         key = 'troop'
-                    elif 'spell' in ctype:
+                    elif 'spell' in ctype or ctype == 'spells':
                         key = 'spell'
-                    elif 'building' in ctype:
+                    elif 'building' in ctype or ctype == 'buildings':
                         key = 'building'
                     else:
-                        # some files might use 'troops', 'spells' or other strings; try mapping by known keywords
-                        if ctype in ('troop', 'troops', 'unit'):
-                            key = 'troop'
-                        elif ctype in ('spell', 'spells'):
-                            key = 'spell'
-                        elif ctype in ('building', 'buildings'):
-                            key = 'building'
-                        else:
-                            key = 'other'
+                        key = 'other'
                     type_counts[key] += 1
                 except Exception:
                     type_counts['other'] += 1
@@ -733,10 +731,10 @@ class ClashRoyaleGUI:
                 ax_pie.set_axis_off()
             else:
                 ax_pie.pie(sizes, labels=labels, autopct='%1.0f%%', colors=[c for c in colors[:len(sizes)]], startangle=90)
-                ax_pie.axis('equal')  # keep pie circular
+                ax_pie.axis('equal')
                 ax_pie.set_title("Card Type Ratio")
 
-            # BAR CHART: Archetype probabilities
+            # BAR CHART (CENTER): Archetype probabilities
             if not all_probabilities:
                 ax_bar.text(0.5, 0.5, "No probabilities available", ha='center', va='center')
                 ax_bar.set_axis_off()
@@ -757,7 +755,82 @@ class ClashRoyaleGUI:
                     height = rect.get_height()
                     ax_bar.text(rect.get_x() + rect.get_width() / 2, height + 0.01, f"{v:.1%}", ha='center', va='bottom', fontsize=8)
 
-            # Layout adjustments to leave room for suptitle
+            # TRAINING DATA PIE (RIGHT): ratios of archetypes present in training_data.py
+            train_counts = {}
+            try:
+                # Primary source: training_data.training_data list of dicts with 'archetype'
+                from training_data import training_data as td
+                for entry in td:
+                    if not isinstance(entry, dict):
+                        continue
+                    a = entry.get('archetype')
+                    if a:
+                        train_counts[a] = train_counts.get(a, 0) + 1
+            except Exception:
+                train_counts = {}
+
+            # fallback: try predictor/trainer/processor attributes or archetype jsons if training_data not present
+            if not train_counts:
+                try:
+                    proc = getattr(getattr(self, 'predictor', None), 'trainer', None)
+                    proc = getattr(proc, 'processor', proc)
+                    counts_attr = None
+                    if proc is not None:
+                        for key in ('archetype_counts', 'archetype_distribution', 'archetype_freq', 'archetype_freqs'):
+                            if hasattr(proc, key):
+                                counts_attr = getattr(proc, key)
+                                break
+                    if isinstance(counts_attr, dict):
+                        train_counts = counts_attr.copy()
+                    elif isinstance(counts_attr, (list, tuple)) and getattr(proc, 'archetypes', None):
+                        for name, cnt in zip(proc.archetypes, counts_attr):
+                            train_counts[name] = float(cnt)
+                    elif getattr(proc, 'archetypes', None):
+                        for a in proc.archetypes:
+                            train_counts[a] = train_counts.get(a, 0) + 1.0
+                except Exception:
+                    pass
+
+            # fallback from archetype json files
+            if not train_counts:
+                try:
+                    import glob, json, os
+                    for path in glob.glob(os.path.join(os.path.dirname(__file__), "*archetype*.json")):
+                        try:
+                            with open(path, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            if isinstance(data, dict):
+                                candidate = {}
+                                for k, v in data.items():
+                                    if isinstance(v, (int, float)):
+                                        candidate[k] = float(v)
+                                    elif isinstance(v, list):
+                                        candidate[k] = float(len(v))
+                                if candidate:
+                                    train_counts = candidate
+                                    break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+
+            # Normalize and draw training pie
+            if not train_counts:
+                ax_train_pie.text(0.5, 0.5, "No training data", ha='center', va='center')
+                ax_train_pie.set_axis_off()
+            else:
+                labels_t = list(train_counts.keys())
+                sizes_t = [float(train_counts[k]) for k in labels_t]
+                pairs = sorted(zip(labels_t, sizes_t), key=lambda x: x[1], reverse=True)
+                labels_t, sizes_t = zip(*pairs)
+                labels_t_disp = [l if len(l) <= 18 else l[:15] + "..." for l in labels_t]
+                cmap = plt.get_cmap('tab20')
+                colors_t = [cmap(i % 20) for i in range(len(labels_t))]
+                ax_train_pie.pie(sizes_t, labels=labels_t_disp, autopct='%1.0f%%', colors=colors_t, startangle=90)
+                ax_train_pie.axis('equal')
+                ax_train_pie.set_title("Archetypes in Training Data")
+
+            # Layout adjustments
             try:
                 fig.tight_layout(rect=[0, 0, 1, 0.94])
             except Exception:
@@ -768,7 +841,6 @@ class ClashRoyaleGUI:
                 if hasattr(self, 'overview_canvas') and self.overview_canvas is not None:
                     self.overview_canvas.draw()
                 else:
-                    # recreate canvas if missing
                     canvas = FigureCanvasTkAgg(fig, master=self.overview_canvas_widget.master if hasattr(self, 'overview_canvas_widget') else None)
                     self.overview_canvas = canvas
                     self.overview_canvas_widget = canvas.get_tk_widget()
@@ -805,7 +877,6 @@ class ClashRoyaleGUI:
                     lbl.pack(side=tk.LEFT, padx=4, pady=4)
 
         except Exception as e:
-            # Keep UI stable on errors
             try:
                 for w in getattr(self, 'overview_images_frame', []).winfo_children():
                     w.destroy()
