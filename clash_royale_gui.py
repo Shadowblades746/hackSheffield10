@@ -1179,8 +1179,8 @@ class ClashRoyaleGUI:
     def fill_example_deck(self):
         """Fill with an example deck"""
         example_cards = [
-            "Mega Knight", "P.E.K.K.A", "Bandit", "Royal Ghost",
-            "Electro Wizard", "Zap", "Poison", "Tornado"
+            "MegaKnight", "PEKKA", "Bandit", "Royal Ghost",
+            "eWiz", "Zap", "Poison", "Tornado"
         ]
 
         for i, card_name in enumerate(example_cards):
