@@ -170,8 +170,14 @@ class DragDropCardGUI:
 
             filtered_cards.append(card)
 
+        # Display and ensure list is reset to top so search never leaves you halfway
         self.display_cards(filtered_cards)
+        try:
+            self.canvas.yview_moveto(0)
+        except Exception:
+            pass
 
+    # python
     def create_cards_scrollable(self, parent):
         """Create scrollable area for cards"""
         # Create frame with scrollbar
@@ -194,9 +200,58 @@ class DragDropCardGUI:
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
+        # Bind mouse enter/leave so wheel works only when pointer is over the card list
+        self.scrollable_frame.bind("<Enter>", lambda e: self._bind_to_mousewheel())
+        self.scrollable_frame.bind("<Leave>", lambda e: self._unbind_from_mousewheel())
+
         # Load and display cards
         self.load_card_images()
         self.display_cards()
+
+
+
+    # Helper methods for mouse-wheel scrolling
+    def _bind_to_mousewheel(self):
+        """Bind mousewheel events when cursor enters the card area"""
+        try:
+            self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)  # Windows / Mac
+            self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Linux scroll up
+            self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Linux scroll down
+        except Exception:
+            pass
+
+    def _unbind_from_mousewheel(self):
+        """Unbind mousewheel events when cursor leaves the card area"""
+        try:
+            self.canvas.unbind_all("<MouseWheel>")
+            self.canvas.unbind_all("<Button-4>")
+            self.canvas.unbind_all("<Button-5>")
+        except Exception:
+            pass
+
+    def _on_mousewheel(self, event):
+        """Handle mouse wheel scroll across platforms"""
+        try:
+            # Linux (Button-4/5)
+            if hasattr(event, "num") and event.num in (4, 5):
+                if event.num == 4:
+                    self.canvas.yview_scroll(-1, "units")
+                else:
+                    self.canvas.yview_scroll(1, "units")
+                return
+
+            # Windows / macOS - event.delta present
+            delta = 0
+            if hasattr(event, "delta"):
+                # On Windows, delta is multiple of 120 (positive when scrolling up)
+                delta = int(-1 * (event.delta / 120))
+            if delta == 0:
+                # fallback single unit
+                delta = 1 if getattr(event, "delta", -1) < 0 else -1
+
+            self.canvas.yview_scroll(delta, "units")
+        except Exception:
+            pass
 
     def load_card_images(self):
         """Load card images from images directory"""
