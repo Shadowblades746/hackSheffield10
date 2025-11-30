@@ -576,6 +576,7 @@ class ClashRoyaleGUI:
                         foreground='white',
                         font=('Arial', 10, 'bold'))
 
+    # python
     def create_main_interface(self):
         """Create the main GUI interface"""
         # Create notebook for tabs
@@ -586,6 +587,13 @@ class ClashRoyaleGUI:
         self.create_drag_drop_tab()
         self.create_text_input_tab()
         self.create_results_tab()
+
+        # Make Text Input tab active and show the card names input by default
+        try:
+            self.notebook.select(0)  # select the Text Input tab (0-based index)
+            self.on_method_change()  # ensure the names_frame is displayed
+        except Exception:
+            pass
 
     def create_drag_drop_tab(self):
         """Create drag and drop tab"""
