@@ -630,12 +630,53 @@ class ClashRoyaleGUI:
         self.overview_card_photos = []  # keep references to PhotoImage objects
 
     # ...existing code...
+    def create_deck_overview_tab(self):
+        """Create Deck overview tab with pie + bar charts of deck composition and archetype probabilities and deck images"""
+        overview_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(overview_frame, text="Deck overview")
+
+        # Chart area (pie on left, bar on right)
+        chart_frame = ttk.LabelFrame(overview_frame, text="Deck Summary", padding="8")
+        chart_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 8))
+
+        # Create matplotlib figure with two subplots (pie left, bar right)
+        fig = plt.Figure(figsize=(9, 3.5), dpi=100)
+        ax_pie = fig.add_subplot(1, 2, 1)
+        ax_bar = fig.add_subplot(1, 2, 2)
+
+        # initial placeholders
+        ax_pie.text(0.5, 0.5, "No deck", ha='center', va='center')
+        ax_bar.text(0.5, 0.5, "No probabilities", ha='center', va='center')
+        ax_pie.set_axis_off()
+        ax_bar.set_axis_off()
+
+        canvas = FigureCanvasTkAgg(fig, master=chart_frame)
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.pack(fill=tk.BOTH, expand=True)
+        self.overview_fig = fig
+        self.overview_ax_pie = ax_pie
+        self.overview_ax_bar = ax_bar
+        self.overview_canvas = canvas
+        self.overview_canvas_widget = canvas_widget
+
+        # Images area (deck)
+        images_frame_label = ttk.LabelFrame(overview_frame, text="Deck", padding="8")
+        images_frame_label.pack(fill=tk.X, padx=5, pady=(0, 8))
+
+        images_frame = ttk.Frame(images_frame_label)
+        images_frame.pack(fill=tk.X, expand=False)
+        self.overview_images_frame = images_frame
+        self.overview_card_photos = []  # keep references to PhotoImage objects
+    # ...existing code...
+
     def update_deck_overview(self, all_probabilities: dict, deck_card_ids: list):
-        """Update overview tab with a vertical bar chart (bars grow bottom→top) of archetype probabilities and deck images.
-        Shows average elixir and 4-card cycle cost above the chart.
+        """Update overview tab with:
+        - pie chart (left) showing Troop/Spell/Building ratios
+        - bar chart (right) showing archetype probabilities (bars bottom->top)
+        - stats (avg elixir, 4-card cycle) as suptitle and deck images below
         """
         try:
-            # Calculate deck stats (avg elixir / 4-card cycle) if possible
+            # Compute simple deck stats (avg elixir, 4-card cycle)
             avg_elixir = None
             four_card_cycle = None
             try:
@@ -643,108 +684,138 @@ class ClashRoyaleGUI:
                 avg_elixir = stats.get('average_elixir')
                 four_card_cycle = stats.get('four_card_cycle')
             except Exception:
-                # Fallback: compute average elixir from available card info
-                try:
-                    elixirs = []
-                    for cid in deck_card_ids:
+                # fallback compute
+                elixirs = []
+                for cid in deck_card_ids or []:
+                    try:
                         info = get_card_info(cid)
-                        el = info.get('elixir', None)
-                        if el is None:
-                            # try integer conversion if string
-                            try:
-                                el = float(info.get('elixir', 0))
-                            except Exception:
-                                el = 0
-                        elixirs.append(el)
-                    if elixirs:
-                        avg_elixir = sum(elixirs) / len(elixirs)
-                        # simple proxy for 4-card cycle: average * 4
-                        four_card_cycle = avg_elixir * 4
-                except Exception:
-                    avg_elixir = None
-                    four_card_cycle = None
+                        el = info.get('elixir', 0) or 0
+                        elixirs.append(float(el))
+                    except Exception:
+                        continue
+                if elixirs:
+                    avg_elixir = sum(elixirs) / len(elixirs)
+                    four_card_cycle = avg_elixir * 4
 
-            # Prepare figure / axis
-            ax = self.overview_fig.axes[0] if self.overview_fig.axes else self.overview_fig.add_subplot(111)
-            ax.clear()
+            # Prepare figure and axes
+            fig = getattr(self, 'overview_fig', None)
+            ax_pie = getattr(self, 'overview_ax_pie', None)
+            ax_bar = getattr(self, 'overview_ax_bar', None)
+            if fig is None or ax_pie is None or ax_bar is None:
+                # recreate if missing
+                self.create_deck_overview_tab()
+                fig = self.overview_fig
+                ax_pie = self.overview_ax_pie
+                ax_bar = self.overview_ax_bar
 
-            # Compose stats title line
+            ax_pie.clear()
+            ax_bar.clear()
+
+            # Title/stats above charts
             stats_parts = []
             if avg_elixir is not None:
                 stats_parts.append(f"Avg Elixir: {avg_elixir:.2f}")
             if four_card_cycle is not None:
                 stats_parts.append(f"4-card cycle: {four_card_cycle:.2f}")
             stats_title = "  •  ".join(stats_parts) if stats_parts else "No deck stats available"
-
-            # Place the title above the chart
             try:
-                # use suptitle so it's above the axes; adjust layout to leave room
-                self.overview_fig.suptitle(stats_title, fontsize=10, y=0.98)
+                fig.suptitle(stats_title, fontsize=10, y=0.98)
             except Exception:
                 pass
 
-            if not all_probabilities:
-                ax.text(0.5, 0.5, "No probabilities available", ha='center', va='center')
-                ax.set_axis_off()
-                if hasattr(self, 'overview_canvas'):
-                    # leave room for suptitle
-                    try:
-                        self.overview_fig.tight_layout(rect=[0, 0, 1, 0.95])
-                    except Exception:
-                        pass
-                    self.overview_canvas.draw()
+            # PIE CHART: Troop / Spell / Building (and Other)
+            type_counts = {"troop": 0, "spell": 0, "building": 0, "other": 0}
+            for cid in deck_card_ids or []:
+                try:
+                    info = get_card_info(cid)
+                    ctype = (info.get('type') or '').lower()
+                    if 'troop' in ctype or 'unit' in ctype or ctype == 'card':
+                        key = 'troop'
+                    elif 'spell' in ctype:
+                        key = 'spell'
+                    elif 'building' in ctype:
+                        key = 'building'
+                    else:
+                        # some files might use 'troops', 'spells' or other strings; try mapping by known keywords
+                        if ctype in ('troop', 'troops', 'unit'):
+                            key = 'troop'
+                        elif ctype in ('spell', 'spells'):
+                            key = 'spell'
+                        elif ctype in ('building', 'buildings'):
+                            key = 'building'
+                        else:
+                            key = 'other'
+                    type_counts[key] += 1
+                except Exception:
+                    type_counts['other'] += 1
+
+            labels = []
+            sizes = []
+            colors = ['#2ecc71', '#3498db', '#f1c40f', '#95a5a6']  # troop, spell, building, other
+            for k, color in zip(['troop', 'spell', 'building', 'other'], colors):
+                if type_counts[k] > 0:
+                    labels.append(f"{k.title()} ({type_counts[k]})")
+                    sizes.append(type_counts[k])
+
+            if not sizes:
+                ax_pie.text(0.5, 0.5, "No cards", ha='center', va='center')
+                ax_pie.set_axis_off()
             else:
-                # Sort by probability descending
+                ax_pie.pie(sizes, labels=labels, autopct='%1.0f%%', colors=[c for c in colors[:len(sizes)]], startangle=90)
+                ax_pie.axis('equal')  # keep pie circular
+                ax_pie.set_title("Card Type Ratio")
+
+            # BAR CHART: Archetype probabilities
+            if not all_probabilities:
+                ax_bar.text(0.5, 0.5, "No probabilities available", ha='center', va='center')
+                ax_bar.set_axis_off()
+            else:
                 items = sorted(all_probabilities.items(), key=lambda x: x[1], reverse=True)
-                labels = [k for k, _ in items]
+                labels_bar = [k for k, _ in items]
                 values = [v for _, v in items]
 
-                x_pos = list(range(len(labels)))
-                bars = ax.bar(x_pos, values, color='#2c3e50')
+                x_pos = list(range(len(labels_bar)))
+                bars = ax_bar.bar(x_pos, values, color='#34495e')
 
-                ax.set_xticks(x_pos)
-                ax.set_xticklabels(labels, rotation=45, ha='right')
-                ax.set_ylabel("Probability")
-                ax.set_ylim(0, 1.0)
+                ax_bar.set_xticks(x_pos)
+                ax_bar.set_xticklabels(labels_bar, rotation=45, ha='right')
+                ax_bar.set_ylabel("Probability")
+                ax_bar.set_ylim(0, 1.0)
 
-                # Add value labels above bars (so they read bottom -> top)
                 for rect, v in zip(bars, values):
                     height = rect.get_height()
-                    ax.text(rect.get_x() + rect.get_width() / 2, height + 0.01, f"{v:.1%}", ha='center', va='bottom', fontsize=8)
+                    ax_bar.text(rect.get_x() + rect.get_width() / 2, height + 0.01, f"{v:.1%}", ha='center', va='bottom', fontsize=8)
 
-                # leave room for suptitle
-                try:
-                    self.overview_fig.tight_layout(rect=[0, 0, 1, 0.95])
-                except Exception:
-                    self.overview_fig.tight_layout()
+            # Layout adjustments to leave room for suptitle
+            try:
+                fig.tight_layout(rect=[0, 0, 1, 0.94])
+            except Exception:
+                fig.tight_layout()
 
-                # Ensure canvas is linked to the updated figure and redraw
-                if hasattr(self, 'overview_canvas') and getattr(self, 'overview_canvas', None) is not None:
-                    try:
-                        self.overview_canvas.figure = self.overview_fig
-                    except Exception:
-                        pass
+            # Redraw canvas
+            try:
+                if hasattr(self, 'overview_canvas') and self.overview_canvas is not None:
                     self.overview_canvas.draw()
                 else:
-                    # fallback: recreate canvas in the same master if possible
-                    master = getattr(self, 'overview_canvas_widget', None)
-                    master_parent = master.master if hasattr(master, 'master') else None
-                    self.overview_canvas = FigureCanvasTkAgg(self.overview_fig, master=master_parent)
-                    self.overview_canvas_widget = self.overview_canvas.get_tk_widget()
+                    # recreate canvas if missing
+                    canvas = FigureCanvasTkAgg(fig, master=self.overview_canvas_widget.master if hasattr(self, 'overview_canvas_widget') else None)
+                    self.overview_canvas = canvas
+                    self.overview_canvas_widget = canvas.get_tk_widget()
                     self.overview_canvas_widget.pack(fill=tk.BOTH, expand=True)
                     self.overview_canvas.draw()
+            except Exception:
+                pass
 
-            # Update deck images below chart (unchanged behaviour)
-            for w in self.overview_images_frame.winfo_children():
+            # Update deck images below chart
+            for w in getattr(self, 'overview_images_frame', []).winfo_children():
                 w.destroy()
             self.overview_card_photos.clear()
 
             images_dir = "images"
-            for cid in deck_card_ids:
+            for cid in deck_card_ids or []:
                 try:
                     card_info = get_card_info(cid)
                     name = card_info.get('name', str(cid))
-                    # try png then jpg
                     image_path = os.path.join(images_dir, f"{name}.png")
                     if not os.path.exists(image_path):
                         image_path = os.path.join(images_dir, f"{name}.jpg")
@@ -764,11 +835,11 @@ class ClashRoyaleGUI:
 
         except Exception as e:
             # Keep UI stable on errors
-            for w in getattr(self, 'overview_images_frame', []).winfo_children() if getattr(self, 'overview_images_frame', None) else []:
-                try:
+            try:
+                for w in getattr(self, 'overview_images_frame', []).winfo_children():
                     w.destroy()
-                except Exception:
-                    pass
+            except Exception:
+                pass
             lbl = ttk.Label(getattr(self, 'overview_images_frame', self.root), text=f"Failed to render overview: {e}")
             lbl.pack()
     # ...existing code...
