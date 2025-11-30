@@ -865,9 +865,7 @@ class ClashRoyaleGUI:
                 try:
                     card_info = get_card_info(cid)
                     name = card_info.get('name', str(cid))
-                    print("kinda good")
                     image_path = os.path.join(images_dir, f"{name}.png")
-                    print("good")
                     if not os.path.exists(image_path):
                         image_path = os.path.join(images_dir, f"{name}.jpg")
                     if os.path.exists(image_path):
@@ -876,12 +874,10 @@ class ClashRoyaleGUI:
                         lbl = tk.Label(self.overview_images_frame, image=photo, bg='#2c3e50')
                         lbl.pack(side=tk.LEFT, padx=4, pady=4)
                         lbl.card_id = cid
-                        print("successfully loaded overview image for", name)
                         self.overview_card_photos.append(photo)
                     else:
                         lbl = tk.Label(self.overview_images_frame, text=name, bg='#34495e', fg='white', wraplength=80, justify='center')
                         lbl.pack(side=tk.LEFT, padx=4, pady=4)
-                        print("failed to find overview image for", name)
                 except Exception as e:
                     print("error loading overview image for card id", cid, ":", e)
                     lbl = tk.Label(self.overview_images_frame, text=str(cid), bg='#34495e', fg='white')
