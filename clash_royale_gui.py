@@ -598,36 +598,7 @@ class ClashRoyaleGUI:
         except Exception:
             pass
 
-    def create_deck_overview_tab(self):
-        """Create Deck overview tab with bar chart of archetype probabilities and deck images"""
-        overview_frame = ttk.Frame(self.notebook, padding="10")
-        self.notebook.add(overview_frame, text="Deck overview")
 
-        # Chart area
-        chart_frame = ttk.LabelFrame(overview_frame, text="Archetype Probabilities", padding="8")
-        chart_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 8))
-
-        # Placeholder matplotlib figure and canvas (will be updated on prediction)
-        fig = plt.Figure(figsize=(6, 3), dpi=100)
-        ax = fig.add_subplot(111)
-        ax.text(0.5, 0.5, "No data yet", horizontalalignment='center', verticalalignment='center')
-        ax.set_axis_off()
-
-        canvas = FigureCanvasTkAgg(fig, master=chart_frame)
-        canvas_widget = canvas.get_tk_widget()
-        canvas_widget.pack(fill=tk.BOTH, expand=True)
-        self.overview_fig = fig
-        self.overview_canvas = canvas
-        self.overview_canvas_widget = canvas_widget
-
-        # Images area (deck)
-        images_frame_label = ttk.LabelFrame(overview_frame, text="Deck", padding="8")
-        images_frame_label.pack(fill=tk.X, padx=5, pady=(0, 8))
-
-        images_frame = ttk.Frame(images_frame_label)
-        images_frame.pack(fill=tk.X, expand=False)
-        self.overview_images_frame = images_frame
-        self.overview_card_photos = []  # keep references to PhotoImage objects
 
     # ...existing code...
     def create_deck_overview_tab(self):
