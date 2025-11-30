@@ -794,11 +794,12 @@ class ClashRoyaleGUI:
             # fallback from archetype json files
             if not train_counts:
                 try:
-                    import glob, json, os
+                    
                     for path in glob.glob(os.path.join(os.path.dirname(__file__), "*archetype*.json")):
                         try:
                             with open(path, "r", encoding="utf-8") as f:
                                 data = json.load(f)
+                                f.close()
                             if isinstance(data, dict):
                                 candidate = {}
                                 for k, v in data.items():
@@ -809,12 +810,15 @@ class ClashRoyaleGUI:
                                 if candidate:
                                     train_counts = candidate
                                     break
+                            
                         except Exception:
                             continue
                 except Exception:
                     pass
 
             # Normalize and draw training pie
+            
+
             if not train_counts:
                 ax_train_pie.text(0.5, 0.5, "No training data", ha='center', va='center')
                 ax_train_pie.set_axis_off()
@@ -855,11 +859,15 @@ class ClashRoyaleGUI:
             self.overview_card_photos.clear()
 
             images_dir = "images"
+            #print("kinda good")
             for cid in deck_card_ids or []:
+
                 try:
                     card_info = get_card_info(cid)
                     name = card_info.get('name', str(cid))
+                    print("kinda good")
                     image_path = os.path.join(images_dir, f"{name}.png")
+                    print("good")
                     if not os.path.exists(image_path):
                         image_path = os.path.join(images_dir, f"{name}.jpg")
                     if os.path.exists(image_path):
@@ -868,11 +876,14 @@ class ClashRoyaleGUI:
                         lbl = tk.Label(self.overview_images_frame, image=photo, bg='#2c3e50')
                         lbl.pack(side=tk.LEFT, padx=4, pady=4)
                         lbl.card_id = cid
+                        print("successfully loaded overview image for", name)
                         self.overview_card_photos.append(photo)
                     else:
                         lbl = tk.Label(self.overview_images_frame, text=name, bg='#34495e', fg='white', wraplength=80, justify='center')
                         lbl.pack(side=tk.LEFT, padx=4, pady=4)
-                except Exception:
+                        print("failed to find overview image for", name)
+                except Exception as e:
+                    print("error loading overview image for card id", cid, ":", e)
                     lbl = tk.Label(self.overview_images_frame, text=str(cid), bg='#34495e', fg='white')
                     lbl.pack(side=tk.LEFT, padx=4, pady=4)
 
